@@ -48,7 +48,7 @@ The extension follows four principles:
 - A double tap on the floating control triggers a webpage refresh.
 - A single tap should not accidentally refresh the page.
 - Detect double taps within a configurable or predefined time interval. The default is 350 ms, measured from the release of the first tap to the press of the second, and it can be set between 200 and 600 ms.
-- A press that is held (see 3.3) or that moves is never counted as a tap, and it cancels a pending double tap.
+- Movement up to 10 px may still count as a tap. A press that is held (see 3.3) or that moves more than 10 px is never counted as a tap, and it cancels a pending double tap.
 - Refresh the current tab without opening another tab.
 - Mouse, touch and pen all use the same rule. Keyboard activation (Enter or Space on the focused ball) and assistive-technology activation refresh immediately, because they are already deliberate.
 
@@ -57,7 +57,7 @@ The extension follows four principles:
 - Support long-press-and-drag interaction. A press becomes a drag after 380 ms without moving more than 10 px.
 - Allow users to move the floating control anywhere within the permitted webpage viewport.
 - Keep the control accessible after repositioning.
-- Prevent accidental dragging during ordinary webpage interaction: a touch that moves before the hold finishes is a swipe, and does neither a drag nor a refresh. The ball takes no part in scrolling (`touch-action: none` applies to the ball only).
+- Prevent accidental dragging during ordinary webpage interaction: a touch that moves more than 10 px before the hold finishes is a swipe, and does neither a drag nor a refresh. The ball takes no part in scrolling (`touch-action: none` applies to the ball only).
 - Avoid placing the control outside the visible viewport: it is clamped inside the viewport with a 6 px gap on every side, and re-fitted when the window is resized or rotated.
 - With a mouse, dragging may also start immediately, since a mouse press on the ball cannot be accidental.
 
@@ -203,7 +203,7 @@ Potential future features:
 - Multiple quick actions.
 - ~~Configurable double-tap interval~~ — done in revision 2.
 - Import/export of extension preferences.
-- Keeping the ball in view while the page is pinch-zoomed.
+- ~~Keeping the ball in view while the page is pinch-zoomed~~ — follows visual viewport dimensions and offsets.
 
 These enhancements should remain optional and should not compromise the simplicity of the core experience.
 

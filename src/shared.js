@@ -93,10 +93,12 @@
 
   // Size of the area `position: fixed` elements are laid out in.
   function viewport() {
+    const visual = window.visualViewport;
+    if (visual) return { w: visual.width, h: visual.height, x: visual.offsetLeft, y: visual.offsetTop };
     const root = document.documentElement;
     // In quirks mode the root element's clientHeight is its content height, not the viewport's.
-    if (document.compatMode === 'BackCompat') return { w: window.innerWidth, h: window.innerHeight };
-    return { w: root.clientWidth || window.innerWidth, h: root.clientHeight || window.innerHeight };
+    if (document.compatMode === 'BackCompat') return { w: window.innerWidth, h: window.innerHeight, x: 0, y: 0 };
+    return { w: root.clientWidth || window.innerWidth, h: root.clientHeight || window.innerHeight, x: 0, y: 0 };
   }
 
   // -------------------------------------------------------------------- icon
@@ -246,14 +248,16 @@
     }
 
     // ---- Position: px for the current frame, ratios for storage.
+    let pendingLayout = false;
+    let deferredPosition = null;
     let curLeft = 0;
     let curTop = 0;
 
     function place(left, top) {
       const v = viewport();
       const t = travel(v.w, v.h, cfg.size);
-      curLeft = clamp(left, t.minX, t.maxX);
-      curTop = clamp(top, t.minY, t.maxY);
+      curLeft = clamp(left, v.x + t.minX, v.x + t.maxX);
+      curTop = clamp(top, v.y + t.minY, v.y + t.maxY);
       face.style.translate = `${curLeft}px ${curTop}px`;
     }
 
@@ -264,7 +268,7 @@
       }
       const v = viewport();
       const p = toPixels(pos, v.w, v.h, cfg.size);
-      place(p.left, p.top);
+      place(v.x + p.left, v.y + p.top);
     }
 
     // ---- Feedback when a refresh is triggered.
@@ -276,9 +280,7 @@
         : icon.animate([{ rotate: '0deg' }, { rotate: '360deg' }], { duration: 650, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
     }
 
-    let lastRefreshAt = -Infinity;
     function refresh() {
-      lastRefreshAt = performance.now();
       try {
         playRefreshFeedback();
       } catch (_) {
@@ -293,7 +295,6 @@
     //   anything else         -> ignored, so the page keeps working normally
     const gesture = { id: null, startX: 0, startY: 0, originLeft: 0, originTop: 0, downAt: 0, secondTap: false, hold: 0 };
     let lastTapEnd = 0; // timestamp of the previous completed tap; 0 = none pending
-    let lastPointerAt = -Infinity; // performance.now() of the last pointer event: tells taps from keyboard / assistive-tech clicks
 
     function endGesture() {
       clearTimeout(gesture.hold);
@@ -318,15 +319,21 @@
     }
 
     function finishDrag() {
-      if (curLeft === gesture.originLeft && curTop === gesture.originTop) return; // held, not moved: nothing to save
-      const v = viewport();
-      pos = toRatios(curLeft, curTop, v.w, v.h, cfg.size);
-      if (onMoveEnd) onMoveEnd({ x: pos.x, y: pos.y });
+      const moved = curLeft !== gesture.originLeft || curTop !== gesture.originTop;
+      if (moved) {
+        const v = viewport();
+        pos = toRatios(curLeft - v.x, curTop - v.y, v.w, v.h, cfg.size);
+        if (onMoveEnd) onMoveEnd({ x: pos.x, y: pos.y });
+      } else if (deferredPosition) {
+        pos = sanitizePosition(deferredPosition.value);
+      }
+      deferredPosition = null;
+      if (pendingLayout || !moved) layout();
+      pendingLayout = false;
     }
 
     face.addEventListener('pointerdown', (event) => {
       event.stopPropagation(); // keep the page's click-away handlers out of it
-      lastPointerAt = performance.now();
       if (!event.isPrimary) return; // a second finger: ignore
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (gesture.id !== null) endGesture(); // left over from a gesture that never finished
@@ -353,6 +360,15 @@
       event.stopPropagation();
       const dx = event.clientX - gesture.startX;
       const dy = event.clientY - gesture.startY;
+      if (event.pointerType !== 'mouse' && Math.hypot(dx, dy) > SLOP_PX
+          && event.timeStamp < gesture.downAt + HOLD_MS) {
+        lastTapEnd = 0;
+        endGesture();
+        curLeft = gesture.originLeft;
+        curTop = gesture.originTop;
+        finishDrag();
+        return;
+      }
       if (phase === 'pressed' && Math.hypot(dx, dy) > SLOP_PX) {
         if (draggable && event.pointerType === 'mouse') {
           beginDrag();
@@ -371,7 +387,6 @@
 
     face.addEventListener('pointerup', (event) => {
       event.stopPropagation();
-      lastPointerAt = performance.now();
       if (event.pointerId !== gesture.id) return;
       const wasPhase = phase;
       const wasSecondTap = gesture.secondTap;
@@ -411,14 +426,14 @@
       paint();
     });
 
+    face.addEventListener('keydown', (event) => {
+      if ((event.key === 'Enter' || event.key === ' ') && event.repeat) event.preventDefault();
+    });
     face.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      // Pointer taps are handled above. A click with no pointer activity around
-      // it came from the keyboard or an assistive technology, which is already a
-      // deliberate action, so it refreshes right away.
-      const now = performance.now();
-      if (now - lastPointerAt > 800 && now - lastRefreshAt > 1000) refresh(); // the cool-down ignores a held-down Enter key repeating
+      // Pointer clicks carry a pointer type or a nonzero click count.
+      if (!event.pointerType && event.detail === 0) refresh();
     });
     // Long-press must not open the browser's context menu or start a drag-and-drop.
     face.addEventListener('contextmenu', (event) => {
@@ -443,6 +458,7 @@
       frame = requestAnimationFrame(() => {
         frame = 0;
         if (phase !== 'dragging') layout();
+        else pendingLayout = true;
       });
     };
     // Keep the ball out of printouts.
@@ -462,6 +478,8 @@
         if (!listening) {
           listening = true;
           window.addEventListener('resize', onResize, { passive: true });
+          window.visualViewport?.addEventListener('resize', onResize, { passive: true });
+          window.visualViewport?.addEventListener('scroll', onResize, { passive: true });
           window.addEventListener('beforeprint', onBeforePrint);
           window.addEventListener('afterprint', onAfterPrint);
         }
@@ -474,13 +492,19 @@
           styleHost();
           applySize();
         }
-        if ('position' in next && phase !== 'dragging') pos = sanitizePosition(next.position);
-        if (phase !== 'dragging') layout(); // never yank the ball out from under a finger
+        if ('position' in next) {
+          if (phase === 'dragging') deferredPosition = { value: next.position };
+          else pos = sanitizePosition(next.position);
+        }
+        if (phase !== 'dragging') layout();
+        else pendingLayout = true; // never yank the ball out from under a finger
         paint();
       },
       destroy() {
         listening = false;
         window.removeEventListener('resize', onResize);
+        window.visualViewport?.removeEventListener('resize', onResize);
+        window.visualViewport?.removeEventListener('scroll', onResize);
         window.removeEventListener('beforeprint', onBeforePrint);
         window.removeEventListener('afterprint', onAfterPrint);
         clearTimeout(gesture.hold);

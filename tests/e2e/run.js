@@ -112,6 +112,14 @@ function check(name, ok, detail = '') {
   // Counts reload requests reaching the background; installs its listener once per worker instance.
   const resetCounter = () => sw.evaluate(() => {
     globalThis.__msgs = 0;
+    globalThis.__reloads = 0;
+    if (!globalThis.__originalReload) {
+      globalThis.__originalReload = chrome.tabs.reload.bind(chrome.tabs);
+      chrome.tabs.reload = async (...args) => {
+        await globalThis.__originalReload(...args);
+        globalThis.__reloads++;
+      };
+    }
     if (!globalThis.__counting) {
       globalThis.__counting = true;
       chrome.runtime.onMessage.addListener((m) => { if (m && m.type === 'dtr:reload-tab') globalThis.__msgs++; return false; });
@@ -121,7 +129,9 @@ function check(name, ok, detail = '') {
 
   async function load(route = '/page') {
     await page.goto(base + route, { waitUntil: 'load' });
-    await sleep(400); // content script runs at document_idle and reads storage
+    await page.waitForFunction(() => Array.from(document.documentElement.children).some(
+      (el) => el.tagName === 'DIV' && el.style.getPropertyValue('z-index') === '2147483647',
+    ), null, { timeout: 10000 });
   }
   async function reloadsAfter(action, wait = 1600) {
     const before = hits.page;
@@ -151,8 +161,8 @@ function check(name, ok, detail = '') {
   await resetCounter();
   await sleep(300);
   n = await reloadsAfter(() => doubleTap(home.x, home.y));
-  const handled = await counted();
-  check('the reload goes through the background script (tabs.reload), not the fallback', n === 1 && handled === 1, `reloads: ${n}, background messages: ${handled}`);
+  const handled = await sw.evaluate(() => globalThis.__reloads);
+  check('the reload goes through the background script (tabs.reload), not the fallback', n === 1 && handled === 1, `reloads: ${n}, successful tabs.reload calls: ${handled}`);
   await sleep(400);
 
   n = await reloadsAfter(async () => { await tap(home.x, home.y); await sleep(600); await tap(home.x, home.y); });
@@ -249,8 +259,8 @@ function check(name, ok, detail = '') {
   check('keyboard: Enter on the focused ball reloads once', n === 1, `reloads: ${n}`);
   await sleep(300);
   await page.keyboard.press('Shift+Tab');
-  n = await reloadsAfter(async () => { await page.keyboard.press('Enter'); await page.keyboard.press('Enter'); await page.keyboard.press('Enter'); });
-  check('keyboard: Enter pressed repeatedly still reloads once', n === 1, `reloads: ${n}`);
+  n = await reloadsAfter(async () => { await page.keyboard.down('Enter'); await page.keyboard.down('Enter'); await page.keyboard.down('Enter'); await page.keyboard.up('Enter'); });
+  check('keyboard: holding Enter with repeated keydowns still reloads once', n === 1, `reloads: ${n}`);
   await sleep(300);
 
   // ---- strict-CSP page (no styles, no scripts allowed)
@@ -305,13 +315,13 @@ function check(name, ok, detail = '') {
   check('options: "Restore defaults" writes the default settings', restored && restored.transparency === 0.35 && restored.size === 44 && restored.doubleTapMs === 350, JSON.stringify(restored));
 
   // preview double-tap: the preview ball responds without leaving the page
-  const urlBefore = opts.url();
+  await opts.evaluate(() => { globalThis.__previewDocument = true; });
   const box = await opts.evaluate(() => { const r = document.getElementById('preview').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
   const optsCdp = await context.newCDPSession(opts);
   const t2 = (type, x, y) => optsCdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
   await t2('touchStart', box.x, box.y); await sleep(40); await t2('touchEnd'); await sleep(90);
   await t2('touchStart', box.x, box.y); await sleep(40); await t2('touchEnd'); await sleep(900);
-  check('options: double-tapping the preview does not navigate', opts.url() === urlBefore);
+  check('options: double-tapping the preview does not navigate', await opts.evaluate(() => globalThis.__previewDocument === true));
 
   // ---- no console errors from the extension on a normal page
   const errors = [];
@@ -340,8 +350,31 @@ function check(name, ok, detail = '') {
   // (Last on purpose: Playwright's --load-extension does not bring the extension back afterwards.)
   await storageClear();
   await load('/page');
-  await sw.evaluate(() => chrome.runtime.reload()).catch(() => {});
-  await sleep(2000);
+  const worlds = [];
+  cdp.on('Runtime.executionContextCreated', ({ context }) => worlds.push(context));
+  await cdp.send('Runtime.disable');
+  await cdp.send('Runtime.enable');
+  let contentWorld;
+  for (const world of worlds) {
+    const probe = await cdp.send('Runtime.evaluate', {
+      contextId: world.id, expression: 'typeof DTR !== "undefined" && !!DTR.api.runtime.id', returnByValue: true,
+    });
+    if (probe.result.value === true) { contentWorld = world.id; break; }
+  }
+  if (!contentWorld) throw new Error('Cannot locate the connected content script');
+  let reloadError;
+  try { await sw.evaluate(() => chrome.runtime.reload()); }
+  catch (error) { reloadError = error; }
+  const deadline = Date.now() + 10000;
+  let invalidated = false;
+  while (Date.now() < deadline) {
+    const probe = await cdp.send('Runtime.evaluate', {
+      contextId: contentWorld, expression: 'DTR.api.runtime.id === undefined', returnByValue: true,
+    });
+    if (probe.result.value === true) { invalidated = true; break; }
+    await sleep(50);
+  }
+  if (!invalidated) throw reloadError || new Error('Extension reload did not invalidate the old content script');
   n = await reloadsAfter(() => doubleTap(home.x, home.y), 2000);
   check('after the extension is reloaded, an already-open page still reloads exactly once (fallback path)', n === 1, `reloads: ${n}`);
 

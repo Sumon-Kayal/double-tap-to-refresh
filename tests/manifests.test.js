@@ -38,9 +38,11 @@ test('least privilege: storage only, http(s) pages only, top frame only', () => 
   assert.deepEqual(chromium.permissions, ['storage']);
   assert.equal(chromium.host_permissions, undefined);
   assert.equal(firefox.host_permissions, undefined);
-  for (const cs of chromium.content_scripts) {
+  for (const cs of [...chromium.content_scripts, ...firefox.content_scripts]) {
     assert.deepEqual(cs.matches, ['http://*/*', 'https://*/*']);
     assert.notEqual(cs.all_frames, true);
+    assert.ok(cs.js.includes('shared.js'), 'shared.js must be present');
+    assert.ok(cs.js.includes('content.js'), 'content.js must be present');
     assert.ok(cs.js.indexOf('shared.js') < cs.js.indexOf('content.js'), 'shared.js must load first');
   }
 });

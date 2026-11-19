@@ -30,6 +30,11 @@
   const statusEl = byId('status');
   let settings = sanitizeSettings();
   let ball = null;
+  let ready = false;
+  let storageRevision = 0;
+  let pending = {};
+  let saving = false;
+  let saveAgain = false;
   let saveTimer = 0;
   let statusTimer = 0;
 
@@ -40,11 +45,23 @@
   }
 
   async function save() {
+    clearTimeout(saveTimer);
+    if (saving) { saveAgain = true; return; }
+    if (!Object.keys(pending).length) return;
+    saving = true;
+    const edits = { ...pending };
     try {
-      await api.storage.local.set({ [STORAGE.settings]: settings });
+      const stored = await api.storage.local.get(STORAGE.settings);
+      await api.storage.local.set({ [STORAGE.settings]: { ...stored[STORAGE.settings], ...edits } });
+      for (const key of Object.keys(edits)) {
+        if (pending[key] === edits[key]) delete pending[key];
+      }
       say('Saved');
     } catch (_) {
       say('Couldn’t save. Try again.');
+    } finally {
+      saving = false;
+      if (saveAgain) { saveAgain = false; save(); }
     }
   }
 
@@ -62,16 +79,22 @@
   }
 
   for (const f of FIELDS) {
+    f.input.disabled = true;
     f.input.min = String(f.min);
     f.input.max = String(f.max);
     f.input.step = String(f.step);
-    f.input.addEventListener('input', () => {
+    const edit = (committed) => {
+      if (!ready) return;
       const shown = Number(f.input.value);
       settings = sanitizeSettings({ ...settings, [f.key]: shown / f.scale });
+      pending[f.key] = settings[f.key];
       f.out.textContent = f.text(shown);
       ball.update({ settings });
-      saveSoon();
-    });
+      if (committed) save();
+      else saveSoon();
+    };
+    f.input.addEventListener('input', () => edit(false));
+    f.input.addEventListener('change', () => edit(true));
   }
 
   byId('reset-position').addEventListener('click', async () => {
@@ -83,23 +106,37 @@
     }
   });
 
+  byId('reset-defaults').disabled = true;
   byId('reset-defaults').addEventListener('click', async () => {
+    if (!ready) return;
     settings = sanitizeSettings();
+    pending = { ...settings };
     ball.update({ settings });
     render();
     clearTimeout(saveTimer);
     await save();
   });
 
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !(STORAGE.settings in changes)) return;
+    storageRevision++;
+    settings = sanitizeSettings({ ...sanitizeSettings(changes[STORAGE.settings].newValue), ...pending });
+    if (ready) { ball.update({ settings }); render(); }
+  });
+
   (async () => {
+    const revision = storageRevision;
     try {
       const stored = await api.storage.local.get(STORAGE.settings);
-      settings = sanitizeSettings(stored[STORAGE.settings]);
+      if (revision === storageRevision) settings = sanitizeSettings(stored[STORAGE.settings]);
     } catch (_) {
       /* keep the defaults */
     }
     ball = createBall({ placement: 'inline', draggable: false, settings });
     ball.mount(byId('preview'));
     render();
+    ready = true;
+    for (const f of FIELDS) f.input.disabled = false;
+    byId('reset-defaults').disabled = false;
   })();
 })();

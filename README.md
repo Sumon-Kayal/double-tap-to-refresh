@@ -15,7 +15,7 @@ and it also runs on Chromium.
 | **Network** | None. No analytics, no accounts, no browsing history. |
 | **License** | [GPL-3.0-only](LICENSE) |
 
-The full design is in [`SPEC.md`](SPEC.md), how it was built and tested is in [`DEVELOPMENT_HISTORY.md`](DEVELOPMENT_HISTORY.md),
+The full design is in [`SPEC.md`](SPEC.md), how it was built and tested is in [the development record](CHANGELOG.md#development-record-included-in-this-release),
 and what changed in each version is in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Quick start
@@ -117,7 +117,7 @@ Release and Beta builds only run add-ons that Mozilla has signed, so there are t
    `web-ext sign --channel=unlisted --source-dir=firefox --api-key=<key> --api-secret=<secret>`
    (keys come from your addons.mozilla.org developer account). This writes a signed `.xpi` to `web-ext-artifacts/`.
 3. On the phone: *Settings → About Firefox*, tap the Firefox logo five times to enable the debug menu, then go back to
-   Settings and choose **Install extension from file**. (Mozilla's bug tracker says that option needs Android 10 or newer.)
+   Settings, copy or download the XPI from your computer to your phone, and choose **Install extension from file**. (Mozilla's bug tracker says that option needs Android 10 or newer.)
 
 The `.xpi` that `build.sh` puts in `dist/` is **not signed**, so release Firefox rejects it as it is.
 
@@ -192,7 +192,7 @@ checks both rules. To cut a release, change `version` in both manifests (and `ve
 
 - Extensions can't run on browser-internal pages (`about:`, `chrome://`), the Chrome Web Store, `addons.mozilla.org`,
   or in the built-in PDF viewers, so the ball doesn't appear there. `file://` pages are not matched.
-- The ball is positioned like any fixed element: when you pinch-zoom in, it stays where it is on the page.
+- The ball follows the visible viewport when you pinch-zoom or pan, keeping its saved relative position.
 - Firefox lets you revoke an add-on's site access. If the ball disappears everywhere, check Add-ons → Double Tap to Refresh →
   Permissions. Keep the match patterns the same in updates: Firefox does not show newly requested host permissions on update.
 - Screen-reader activation (for example TalkBack's double-tap) hasn't been tried.
@@ -203,7 +203,7 @@ checks both rules. To cut a release, change `version` in both manifests (and `ve
 
 Please say which browser and version you use (and the device and Android version, if it is a phone), the page where it
 happened, what you did, what you expected and what happened instead, and whether the ball appeared at all.
-For Firefox for Android, `DEVELOPMENT_HISTORY.md` section 9 lists the first places to look for each symptom.
+For Firefox for Android, [the troubleshooting notes](CHANGELOG.md#firefox-for-android-troubleshooting-notes) lists the first places to look for each symptom.
 
 ## Changelog
 

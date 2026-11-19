@@ -22,7 +22,7 @@
     try {
       return await api.storage.local.get(KEYS);
     } catch (_) {
-      return {}; // storage unavailable: start from the defaults
+      return null; // distinguish failure from a successful read of missing values
     }
   }
 
@@ -53,22 +53,35 @@
   // If the page removes our node, put it back, but give up if it keeps doing so.
   function keepMounted(ball) {
     let attempts = 0;
+    let root = document.documentElement;
     const observer = new MutationObserver(() => {
+      if (root !== document.documentElement) {
+        root = document.documentElement;
+        observer.disconnect();
+        observer.observe(document, { childList: true });
+        if (root) {
+          observer.observe(root, { childList: true });
+          ball.mount(root);
+        }
+        return;
+      }
       if (ball.isMounted()) return;
       if (++attempts > 5) {
         observer.disconnect();
+        observer.observe(document, { childList: true });
         return;
       }
-      ball.mount(document.documentElement);
+      if (root) ball.mount(root);
     });
-    observer.observe(document.documentElement, { childList: true });
+    observer.observe(document, { childList: true });
+    observer.observe(root, { childList: true });
   }
 
   loadStored().then((stored) => {
     const ball = createBall({
       placement: 'fixed',
-      settings: stored[STORAGE.settings],
-      position: stored[STORAGE.position],
+      settings: stored?.[STORAGE.settings],
+      position: stored?.[STORAGE.position],
       onRefresh: requestReload,
       onMoveEnd: savePosition,
     });
@@ -88,6 +101,7 @@
     window.addEventListener('pageshow', (event) => {
       if (!event.persisted) return;
       loadStored().then((fresh) => {
+        if (!fresh) return;
         ball.update({ settings: fresh[STORAGE.settings], position: fresh[STORAGE.position] });
       });
     });

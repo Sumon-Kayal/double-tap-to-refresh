@@ -23,7 +23,7 @@
           <label for="transparency">Transparency</label>
           <output id="transparency-out" for="transparency"></output>
         </div>
-        <input id="transparency" type="range">
+        <input id="transparency" type="range" disabled>
       </div>
 
       <div class="control">
@@ -31,7 +31,7 @@
           <label for="size">Size</label>
           <output id="size-out" for="size"></output>
         </div>
-        <input id="size" type="range">
+        <input id="size" type="range" disabled>
       </div>
 
       <div class="control">
@@ -39,14 +39,14 @@
           <label for="timing">Double-tap timing</label>
           <output id="timing-out" for="timing"></output>
         </div>
-        <input id="timing" type="range">
+        <input id="timing" type="range" disabled>
         <p class="help">How quickly the second tap has to follow the first.</p>
       </div>
     </section>
 
     <div class="actions">
       <button id="reset-position" type="button">Reset position</button>
-      <button id="reset-defaults" type="button">Restore defaults</button>
+      <button id="reset-defaults" type="button" disabled>Restore defaults</button>
     </div>
     <p id="status" class="status" role="status" aria-live="polite"></p>
 
