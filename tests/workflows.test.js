@@ -139,3 +139,15 @@ test('the test release builds both browsers and offers the two extensions as pla
   assert.match(t, /double-tap-to-refresh-chromium-\*\.zip/);
   assert.match(t, /double-tap-to-refresh-firefox-\*\.xpi/);
 });
+
+test('Firefox signing uses the verified build commit, even if the release tag moves', () => {
+  const t = text('firefox.yml');
+  assert.match(t, /sha: \$\{\{ steps\.revision\.outputs\.sha \}\}/);
+  assert.match(t, /id: revision/);
+  assert.match(t, /echo "sha=\$expected" >> "\$GITHUB_OUTPUT"/);
+  const sign = t.split(/^  sign:$/m)[1].split(/^  publish:$/m)[0];
+  assert.match(sign, /ref: \$\{\{ needs\.build\.outputs\.sha \}\}/);
+  assert.match(sign, /EXPECTED_SHA: \$\{\{ needs\.build\.outputs\.sha \}\}/);
+  assert.match(sign, /git rev-parse HEAD\)" != "\$EXPECTED_SHA"/);
+  assert.doesNotMatch(sign, /refs\/tags/);
+});

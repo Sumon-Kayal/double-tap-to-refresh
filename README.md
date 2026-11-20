@@ -218,8 +218,15 @@ firefox-main-release-0.1.0.tar.gz
 **Signing.** Firefox build signs with Mozilla as an unlisted add-on. Add two repository secrets (Settings, Secrets and
 variables, Actions): `WEB_EXT_API_KEY` and `WEB_EXT_API_SECRET`, the JWT issuer and JWT secret from
 <https://addons.mozilla.org/developers/addon/api/key/>. Only the signing step can read them; the Chromium workflow and the
-test release use no secrets. Mozilla signs each version number only once, so raise `version` in both manifests before every
-Firefox run, development builds included. The Chromium zip is not signed.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:0bc33450fb56305aaf42e413467102bbd3f91526541b5ea5330d0f663ac9f90c -->
+
+test release use no secrets. Mozilla signs each version number only once. Identical retries compare and reuse the existing
+submission, including waiting for pending approval. Raise `version` in both manifests whenever contents change, development
+builds included. The Chromium zip is not signed.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 **Safety.** Every action is pinned to a commit SHA. The build job can only read the repository; a short separate job adds
 the files to the release and is the only one that can write. The typed tag goes through an environment variable and is

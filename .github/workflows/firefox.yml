@@ -10,7 +10,8 @@
 # Needs two repository secrets, WEB_EXT_API_KEY and WEB_EXT_API_SECRET (the JWT issuer and JWT
 # secret from https://addons.mozilla.org/developers/addon/api/key/). Only the isolated signing
 # job can read them. Mozilla signs each version number only once, so raise "version" in
-# manifests/firefox.json (and chromium.json) before every run, development builds included.
+# manifests/firefox.json (and chromium.json) for changed contents, development builds included.
+# Identical retries reuse the submission.
 name: Firefox build
 
 on:
@@ -33,7 +34,7 @@ jobs:
       contents: read
     outputs:
       mode: ${{ steps.source.outputs.mode }}
-      ref: ${{ steps.source.outputs.ref }}
+      sha: ${{ steps.revision.outputs.sha }}
       tag: ${{ steps.source.outputs.tag }}
     steps:
       # The tag is typed by a person, so it only ever travels through env: and is checked before use.
@@ -73,6 +74,7 @@ jobs:
           persist-credentials: false
 
       - name: Confirm the checked-out revision
+        id: revision
         env:
           MODE: ${{ steps.source.outputs.mode }}
           TAG: ${{ steps.source.outputs.tag }}
@@ -87,6 +89,7 @@ jobs:
             echo "::error::The checked-out revision is not the one that was asked for."
             exit 1
           fi
+          echo "sha=$expected" >> "$GITHUB_OUTPUT"
           git log -1 --format='Building %h (%cI)'
 
       - name: Set up Node.js
@@ -126,22 +129,16 @@ jobs:
       - name: Check out the source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.build.outputs.ref }}
+          ref: ${{ needs.build.outputs.sha }}
           persist-credentials: false
 
       - name: Confirm the checked-out revision
         env:
-          MODE: ${{ needs.build.outputs.mode }}
-          TAG: ${{ needs.build.outputs.tag }}
+          EXPECTED_SHA: ${{ needs.build.outputs.sha }}
         run: |
           set -euo pipefail
-          if [ "$MODE" = release ]; then
-            expected=$(git rev-parse "refs/tags/$TAG^{commit}")
-          else
-            expected=$GITHUB_SHA
-          fi
-          if [ "$(git rev-parse HEAD)" != "$expected" ]; then
-            echo "::error::The checked-out revision is not the one that was asked for."
+          if [ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]; then
+            echo "::error::The signing checkout differs from the built revision."
             exit 1
           fi
 
@@ -171,9 +168,15 @@ jobs:
             exit 1
           fi
           mkdir -p dist
-          web-ext sign --source-dir firefox --artifacts-dir web-ext-artifacts \
-            --channel unlisted --approval-timeout 900000 --no-config-discovery
-          cp web-ext-artifacts/*.xpi dist/firefox-signed.xpi
+          if python3 scripts/resume-firefox-signing.py; then
+            echo "Reused the matching Mozilla submission."
+          else
+            status=$?
+            [ "$status" -eq 3 ] || exit "$status"
+            web-ext sign --source-dir firefox --artifacts-dir web-ext-artifacts \
+              --channel unlisted --approval-timeout 900000 --no-config-discovery
+            cp web-ext-artifacts/*.xpi dist/firefox-signed.xpi
+          fi
 
       - name: Pack the signed XPI with its source
         id: archive

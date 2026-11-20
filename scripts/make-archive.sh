@@ -62,6 +62,7 @@ trap 'rm -rf "$stage"' EXIT
 mkdir "$stage/extension" "$stage/source"
 cp "$package" "$stage/extension/$packaged_as"
 git archive --format=tar HEAD | tar -x -C "$stage/source"
+printf '%s\n' "$epoch" > "$stage/source/.source-date-epoch"
 
 leaks=$(cd "$stage/source" && find . -type f \( \
   -name '.env' -o -name '.env.*' -o -name '.npmrc' -o -name '.web-extension-id' \

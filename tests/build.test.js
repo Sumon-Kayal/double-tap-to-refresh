@@ -208,3 +208,23 @@ test('.gitignore keeps the generated folders, signing leftovers and secrets out 
     assert.equal(run('git', ['check-ignore', '-q', tracked], dir).status, 1, `${tracked} must not be ignored`);
   }
 });
+
+// An archive has no .git; it must retain the exact timestamp selected at packaging time.
+test('source archive rebuilds reproduce the original packages without Git or epoch overrides', { skip: SKIP }, (t) => {
+  const dir = scratch(t, { git: true });
+  fs.writeFileSync(path.join(dir, '.source-date-epoch'), '1800000000\n');
+  assert.equal(build(dir).status, 0);
+  const pkg = fs.readdirSync(path.join(dir, 'dist')).find((name) => name.endsWith('.zip'));
+  const original = sha(path.join(dir, 'dist', pkg));
+  const made = run('bash', ['scripts/make-archive.sh', 'chromium', 'release', 'main', `dist/${pkg}`], dir);
+  assert.equal(made.status, 0, made.stderr);
+  const extracted = path.join(dir, 'extracted');
+  fs.mkdirSync(extracted);
+  assert.equal(run('tar', ['-xzf', path.join(dir, made.stdout.trim()), '-C', extracted], dir).status, 0);
+  const source = path.join(extracted, 'source');
+  const gitEpoch = run('git', ['log', '-1', '--format=%ct'], dir).stdout.trim();
+  assert.equal(fs.readFileSync(path.join(source, '.source-date-epoch'), 'utf8').trim(), gitEpoch,
+    'ordinary checkout uses Git even if an archived epoch exists');
+  assert.equal(build(source, 'chromium').status, 0);
+  assert.equal(sha(path.join(source, 'dist', pkg)), original);
+});
