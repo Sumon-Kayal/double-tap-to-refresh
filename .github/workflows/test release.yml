@@ -4,8 +4,8 @@
 #
 # scripts/build.sh creates the chromium/ and firefox/ folders, puts the extension's files in each
 # (src/ plus that browser's manifest) together with the license saved as LICENSE.txt, and zips
-# them. When the run finishes, download the two files from its page. They are the extensions
-# themselves, not archives of them, and they are kept for 3 days.
+# them. When the run finishes, download the bundle tarball from the workflow run page. It contains
+# the Chromium extension, the unsigned Firefox extension, and two source code archives, kept for 3 days.
 #
 # The Firefox file is not signed, so Firefox for Android Release and Beta will refuse it (see
 # README.md). The "Firefox build" workflow makes a signed one. The folders are generated and
@@ -38,36 +38,42 @@ jobs:
       - name: Run the tests
         run: node --test
 
-      - name: Build chromium/ and firefox/
+      - name: Build extensions and bundle tarball
         id: build
         run: |
           set -euo pipefail
           bash scripts/build.sh
+
           chromium=$(ls dist/double-tap-to-refresh-chromium-*.zip)
           firefox=$(ls dist/double-tap-to-refresh-firefox-*.xpi)
-          { echo "chromium=$chromium"; echo "firefox=$firefox"; } >> "$GITHUB_OUTPUT"
+
+          # Create two source archives from the checked-out repo (excluding build/git clutter)
+          src_chrome="dist/source-chrome.tar.gz"
+          src_firefox="dist/source-firefox.tar.gz"
+          tar -czf "$src_chrome" --exclude='./.git' --exclude='./dist' --exclude='./node_modules' .
+          tar -czf "$src_firefox" --exclude='./.git' --exclude='./dist' --exclude='./node_modules' .
+
+          bundle="dist/test-release-bundle.tar.gz"
+          tar -czf "$bundle" -C dist \
+            "$(basename "$chromium")" \
+            "$(basename "$src_chrome")" \
+            "$(basename "$firefox")" \
+            "$(basename "$src_firefox")"
+
+          echo "bundle=$bundle" >> "$GITHUB_OUTPUT"
           {
             echo '### Test release'
             echo
             echo '```'
-            sha256sum "$chromium" "$firefox"
+            sha256sum "$chromium" "$src_chrome" "$firefox" "$src_firefox" "$bundle"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload the Chromium extension
+      - name: Upload test release tarball
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Chromium
-          path: ${{ steps.build.outputs.chromium }}
-          archive: false
-          retention-days: 3
-          if-no-files-found: error
-
-      - name: Upload the Firefox extension (not signed)
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: Firefox
-          path: ${{ steps.build.outputs.firefox }}
+          name: Test-release-bundle
+          path: ${{ steps.build.outputs.bundle }}
           archive: false
           retention-days: 3
           if-no-files-found: error
