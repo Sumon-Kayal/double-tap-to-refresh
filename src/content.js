@@ -1,4 +1,13 @@
 /*
+ * Copyright (C) 2026 The Double Tap to Refresh authors
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This file is part of Double Tap to Refresh, free software under version 3 of the
+ * GNU General Public License. It comes WITHOUT ANY WARRANTY. The license text is in
+ * LICENSE.md (source) and LICENSE.txt (packages), or at https://www.gnu.org/licenses/.
+ */
+
+/*
  * Double Tap to Refresh — content script.
  *
  * Puts the floating ball on web pages (top frame only) and asks the background

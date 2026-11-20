@@ -124,7 +124,7 @@ The extension uses Manifest V3 with the WebExtensions API on both browser famili
 | Options page | Preferences with a live preview, opened in a tab. |
 | Storage API | `storage.local`, keys `settings` and `position`. |
 
-Both browsers are built from one source: `src/` is copied next to the right manifest by `scripts/build.sh`.
+Both browsers are built from one source: `src/` is copied next to the right manifest by `scripts/build.sh`, which also saves the license as `LICENSE.txt` in each build.
 
 ### 6.2 APIs
 
@@ -187,7 +187,7 @@ Follow the principle of least privilege.
 
 ## 8. Performance Requirements
 
-- Keep the content script lightweight (about 22 KB unminified, comments included, no libraries).
+- Keep the content script lightweight (about 24 KB unminified, comments and license header included, no libraries).
 - Avoid unnecessary background processing: the background wakes only for a message or a toolbar click.
 - Minimize DOM manipulation: one host element and one button per page.
 - Avoid interfering with webpage scrolling and touch interactions: only touches that start on the ball are affected.

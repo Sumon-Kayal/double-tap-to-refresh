@@ -1,5 +1,5 @@
 'use strict';
-// Keeps the two manifests honest. Run: node --test tests/
+// Keeps the two manifests honest. Run: node --test
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
