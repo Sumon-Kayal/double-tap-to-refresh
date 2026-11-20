@@ -57,6 +57,7 @@ jobs:
       - name: Upload the Chromium extension
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: Chromium
           path: ${{ steps.build.outputs.chromium }}
           archive: false
           retention-days: 3
@@ -65,6 +66,7 @@ jobs:
       - name: Upload the Firefox extension (not signed)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
+          name: Firefox
           path: ${{ steps.build.outputs.firefox }}
           archive: false
           retention-days: 3

@@ -8,8 +8,8 @@
 #                added to the GitHub Release that already exists for the tag.
 #
 # Needs two repository secrets, WEB_EXT_API_KEY and WEB_EXT_API_SECRET (the JWT issuer and JWT
-# secret from https://addons.mozilla.org/developers/addon/api/key/). Only the signing step can
-# read them. Mozilla signs each version number only once, so raise "version" in
+# secret from https://addons.mozilla.org/developers/addon/api/key/). Only the isolated signing
+# job can read them. Mozilla signs each version number only once, so raise "version" in
 # manifests/firefox.json (and chromium.json) before every run, development builds included.
 name: Firefox build
 
@@ -26,13 +26,14 @@ permissions:
 
 jobs:
   build:
-    name: Build, sign and pack
+    name: Test, build and lint
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     permissions:
       contents: read
     outputs:
       mode: ${{ steps.source.outputs.mode }}
+      ref: ${{ steps.source.outputs.ref }}
       tag: ${{ steps.source.outputs.tag }}
     steps:
       # The tag is typed by a person, so it only ever travels through env: and is checked before use.
@@ -106,6 +107,59 @@ jobs:
       - name: Lint it
         run: web-ext lint --source-dir firefox --warnings-as-errors --no-config-discovery
 
+      - name: Hand over built extension to the signing job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Firefox-Unsigned-Dir
+          path: firefox/
+          retention-days: 1
+          if-no-files-found: error
+
+  sign:
+    name: Sign and pack
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.ref }}
+          persist-credentials: false
+
+      - name: Confirm the checked-out revision
+        env:
+          MODE: ${{ needs.build.outputs.mode }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$MODE" = release ]; then
+            expected=$(git rev-parse "refs/tags/$TAG^{commit}")
+          else
+            expected=$GITHUB_SHA
+          fi
+          if [ "$(git rev-parse HEAD)" != "$expected" ]; then
+            echo "::error::The checked-out revision is not the one that was asked for."
+            exit 1
+          fi
+
+      - name: Download the built extension directory
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: Firefox-Unsigned-Dir
+          path: firefox
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install web-ext
+        run: npm install --global --ignore-scripts --no-audit --no-fund web-ext@10.8.0
+
       - name: Sign with Mozilla (unlisted)
         env:
           WEB_EXT_API_KEY: ${{ secrets.WEB_EXT_API_KEY }}
@@ -116,6 +170,7 @@ jobs:
             echo "::error::Add the repository secrets WEB_EXT_API_KEY and WEB_EXT_API_SECRET first."
             exit 1
           fi
+          mkdir -p dist
           web-ext sign --source-dir firefox --artifacts-dir web-ext-artifacts \
             --channel unlisted --approval-timeout 900000 --no-config-discovery
           cp web-ext-artifacts/*.xpi dist/firefox-signed.xpi
@@ -123,7 +178,7 @@ jobs:
       - name: Pack the signed XPI with its source
         id: archive
         env:
-          MODE: ${{ steps.source.outputs.mode }}
+          MODE: ${{ needs.build.outputs.mode }}
           BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
@@ -138,7 +193,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the development archive (kept for 72 hours)
-        if: steps.source.outputs.mode == 'development'
+        if: needs.build.outputs.mode == 'development'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Firefox-Development
@@ -149,7 +204,7 @@ jobs:
       # Not a release asset: a one-day hand-over, so the publish job (the only one allowed to
       # write to the repository) never runs the build, and can be re-run if the upload fails.
       - name: Pass the release files to the publish job
-        if: steps.source.outputs.mode == 'release'
+        if: needs.build.outputs.mode == 'release'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Firefox-Release-Files
@@ -161,7 +216,9 @@ jobs:
 
   publish:
     name: Add to the GitHub Release
-    needs: build
+    needs:
+      - build
+      - sign
     if: needs.build.outputs.mode == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 10
