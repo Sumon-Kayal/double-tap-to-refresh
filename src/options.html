@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Double Tap to Refresh</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <main>
+    <h1>Double Tap to Refresh</h1>
+    <p class="lede">Double-tap the ball to reload the page you’re on. To move it, press and hold, then drag.</p>
+
+    <div class="stage" aria-label="Preview of the ball on a light and a dark page">
+      <div id="preview"></div>
+    </div>
+    <p class="hint">Preview: double-tap the ball to try the timing.</p>
+
+    <section class="controls" aria-label="Settings">
+      <div class="control">
+        <div class="row">
+          <label for="transparency">Transparency</label>
+          <output id="transparency-out" for="transparency"></output>
+        </div>
+        <input id="transparency" type="range" disabled>
+      </div>
+
+      <div class="control">
+        <div class="row">
+          <label for="size">Size</label>
+          <output id="size-out" for="size"></output>
+        </div>
+        <input id="size" type="range" disabled>
+      </div>
+
+      <div class="control">
+        <div class="row">
+          <label for="timing">Double-tap timing</label>
+          <output id="timing-out" for="timing"></output>
+        </div>
+        <input id="timing" type="range" disabled>
+        <p class="help">How quickly the second tap has to follow the first.</p>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="reset-position" type="button">Reset position</button>
+      <button id="reset-defaults" type="button" disabled>Restore defaults</button>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <p class="foot">Settings are saved on this device only.</p>
+  </main>
+
+  <script src="shared.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
