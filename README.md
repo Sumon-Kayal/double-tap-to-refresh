@@ -4,8 +4,8 @@ A small floating ball, inspired by Xiaomi's MIUI Quick Ball, that you can park a
 **Double-tap it to reload the page. Press, hold, then drag to move it.** Built for Firefox on Android first,
 and it also runs on Chromium.
 
-> **Beta (0.1.0-beta).** The Chromium build has been tested in a real browser. The Firefox build has **not** been run in
-> Firefox or on an Android device yet, so expect rough edges there. See [Testing status](#testing-status).
+> **Beta (0.1.0-beta).** The Chromium build has been tested in a real browser. The Firefox build is reported working on
+> Waterfox for Android 160 but has no automated browser test, so expect rough edges. See [Testing status](#testing-status).
 
 | | |
 |---|---|
@@ -13,7 +13,7 @@ and it also runs on Chromium.
 | **Browsers** | Firefox 160+ (desktop and Android), Chromium 152+ |
 | **Permissions** | `storage` only. Runs on `http://` and `https://` pages, top frame only. |
 | **Network** | None. No analytics, no accounts, no browsing history. |
-| **License** | [GPL-3.0-only](LICENSE) |
+| **License** | [GPL-3.0-only](LICENSE.md) |
 
 The full design is in [`SPEC.md`](SPEC.md), how it was built and tested is in [the development record](CHANGELOG.md#development-record-included-in-this-release),
 and what changed in each version is in [`CHANGELOG.md`](CHANGELOG.md).
@@ -37,7 +37,7 @@ Then open any web page and double-tap the ball.
 - Settings with a live preview: transparency, size and double-tap timing. Changes reach every open page right away.
 - Isolated from the page: a closed shadow root, styled only through the CSSOM, so page CSS can't restyle it and a strict
   Content-Security-Policy can't leave it unstyled.
-- Small and local: about 22 KB of script per page, no libraries, no network requests.
+- Small and local: about 24 KB of script per page, no libraries, no network requests.
 
 ## Compatibility
 
@@ -71,8 +71,9 @@ Firefox runs extensions in private windows only if you allow it (Add-ons → Dou
 
 ## Install
 
-Ready-made packages are in `dist/` (`double-tap-to-refresh-chromium-0.1.0-beta.zip` and
-`double-tap-to-refresh-firefox-0.1.0-beta.xpi`), and the unpacked builds are in `chromium/` and `firefox/`.
+`./scripts/build.sh` puts the packages in `dist/` (`double-tap-to-refresh-chromium-0.1.0-beta.zip` and
+`double-tap-to-refresh-firefox-0.1.0.xpi`) and the unpacked builds in `chromium/` and `firefox/`. No computer at hand? The
+[Test release workflow](#releases-and-automation) builds both on GitHub and lets you download them.
 Chromium shows the version as `0.1.0-beta`; Firefox shows `0.1.0` (see [Version numbers](#version-numbers)).
 
 ### Chromium
@@ -112,10 +113,12 @@ Release and Beta builds only run add-ons that Mozilla has signed, so there are t
 
 **2. Install it for good.** Get it signed, then install the signed file:
 
-1. Change `gecko.id` in `manifests/firefox.json` to an ID of your own. It can't be changed later.
-2. `./scripts/build.sh`, then
+1. The add-on ID in `manifests/firefox.json` (`double-tap-to-refresh@sumon-kayal`) becomes permanent with the first
+   signing, so change it now if you want a different one.
+2. `./scripts/build.sh firefox`, then
    `web-ext sign --channel=unlisted --source-dir=firefox --api-key=<key> --api-secret=<secret>`
    (keys come from your addons.mozilla.org developer account). This writes a signed `.xpi` to `web-ext-artifacts/`.
+   The [Firefox build workflow](#releases-and-automation) does the same on GitHub, with the keys stored as secrets.
 3. On the phone: *Settings → About Firefox*, tap the Firefox logo five times to enable the debug menu, then go back to
    Settings, copy or download the XPI from your computer to your phone, and choose **Install extension from file**. (Mozilla's bug tracker says that option needs Android 10 or newer.)
 
@@ -149,44 +152,103 @@ In the options page, *Reset position* puts the ball back at its starting spot (r
 ### Project layout
 
 ```
-src/         the extension's code, shared by both browsers (edit here)
-manifests/   chromium.json and firefox.json (the only per-browser differences)
-scripts/     build.sh, make-icons.py
-tests/       node --test (no dependencies); tests/e2e/run.js is the optional browser test (needs Playwright)
-chromium/    built output, load unpacked          (generated)
-firefox/     built output, load or package        (generated)
-dist/        zip and unsigned xpi of the builds   (generated)
-LICENSE      GNU General Public License, version 3 (copied into every build)
-CHANGELOG.md what changed in each version
+src/                the extension's code, shared by both browsers (edit here)
+manifests/          chromium.json and firefox.json (the only per-browser differences)
+scripts/            build.sh, make-archive.sh, lib.sh (shared helpers), make-icons.py
+tests/              node --test (no dependencies); tests/e2e/run.js is the optional browser test (needs Playwright)
+.github/workflows/  chromium.yml, firefox.yml, test release.yml (manual runs only)
+chromium/           built output, load unpacked          (generated, in .gitignore)
+firefox/            built output, load or package        (generated, in .gitignore)
+dist/               zip and unsigned xpi of the builds   (generated, in .gitignore)
+LICENSE.md          GNU General Public License, version 3 (saved as LICENSE.txt in every build)
+CHANGELOG.md        what changed in each version
 ```
 
-`./scripts/build.sh` rebuilds `chromium/`, `firefox/` and `dist/` from `src/`, `manifests/` and `LICENSE`.
-It needs `bash` and `zip` (Termux: `pkg install zip`). Never edit `chromium/` or `firefox/` by hand; the next build overwrites them.
+`./scripts/build.sh [chromium|firefox|all]` rebuilds `chromium/`, `firefox/` and `dist/` from `src/`, `manifests/` and
+`LICENSE.md`, which each build gets as `LICENSE.txt`. It needs `bash` and `zip` (Termux: `pkg install zip`), and the same
+source gives byte-identical packages. Never edit `chromium/` or `firefox/` by hand; the next build overwrites them. They are
+generated and listed in `.gitignore`; if an older commit already tracks them, run `git rm -r --cached chromium firefox` once.
 
-`node --test` runs the unit tests (settings and position maths) and checks that the two manifests agree, ask for nothing
-extra and carry a valid version. `tests/e2e/run.js` drives the built Chromium extension in a real browser with touch emulation:
+`node --test` (no folder argument; Node 22 was used) runs the unit tests (settings and position maths), checks that the two
+manifests agree, ask for nothing extra and carry a valid version, and checks the build scripts, the workflow rules, the license
+headers and the size of the per-page script. `tests/e2e/run.js` drives the built Chromium extension in a real browser with touch emulation:
 `npm install playwright && npx playwright install chromium`, then `./scripts/build.sh && node tests/e2e/run.js`.
-`python3 scripts/make-icons.py` redraws the icons (needs Pillow).
+`python3 scripts/make-icons.py` redraws the icons (needs Pillow; with `pip install pyoxipng` they come out about 40% smaller).
 
 ### Version numbers
 
 Both manifests carry `"version": "0.1.0"`, the number the browsers compare. It must be one to four numbers separated by dots:
 addons.mozilla.org accepts nothing else, and Chromium wants plain numbers too. A suffix such as `-beta` therefore can't go in `version`.
 The beta label is `"version_name": "0.1.0-beta"` in `manifests/chromium.json`, which Chromium shows on its extensions page.
-Firefox has no such field here, so it shows `0.1.0`. `build.sh` names the files in `dist/` after the label, and `node --test`
-checks both rules. To cut a release, change `version` in both manifests (and `version_name` in the Chromium one), add an entry to
-`CHANGELOG.md`, then run `./scripts/build.sh`.
+Firefox has no such field here, so it shows `0.1.0`. `build.sh` names each file in `dist/` after its own manifest's label
+(`0.1.0-beta` for Chromium, `0.1.0` for Firefox), and `node --test` checks both rules. To cut a release, change `version` in both
+manifests (and `version_name` in the Chromium one), add an entry to `CHANGELOG.md`, tag the commit, create the GitHub Release for
+the tag, then run the [workflows](#releases-and-automation) with that tag.
+
+## Releases and automation
+
+Three workflows in `.github/workflows/` build the extensions on GitHub. They run **only when you start them by hand**
+(Actions, pick the workflow, *Run workflow*); nothing runs on a push or a pull request. All three build with
+`scripts/build.sh`, so a workflow gives the same files as a local build.
+
+| Workflow | Use it for | Result |
+|---|---|---|
+| **Test release** (`test release.yml`) | A quick test of any branch | Two plain downloads on the run page, kept 3 days: the Chromium `.zip` and the **unsigned** Firefox `.xpi` |
+| **Chromium build** (`chromium.yml`) | Development and release builds | `chromium-<branch>-<mode>-<version>.tar.gz` |
+| **Firefox build** (`firefox.yml`) | Development and release builds, signed by Mozilla | `firefox-<branch>-<mode>-<version>.tar.gz` |
+
+The branch always comes from *Use workflow from*. Chromium build and Firefox build take one optional input, **tag**:
+
+- **Tag empty: development build.** Builds that branch. The archive is the artifact `Chromium-Development` or
+  `Firefox-Development` and is deleted after 72 hours. No release is touched.
+- **Tag filled: release build.** Builds exactly that tag, whichever branch you started from. The tag must exist and
+  already have a published GitHub Release; the workflow adds the package and the archive to that release and never
+  creates or edits one. A tag that does not exist, a tag without a release, or a tag selected as the branch stops the run
+  before anything is signed.
+
+Each archive holds the package and the source it came from. `<mode>` is `development` or `release`, `<version>` comes from
+the browser's manifest, and in `<branch>` any character other than a letter, digit, `.`, `_` or `-` becomes `-`:
+
+```
+firefox-main-release-0.1.0.tar.gz
+├── extension/   firefox-signed.xpi   (chromium.zip in the Chromium archive)
+└── source/      the committed files of that exact revision
+```
+
+**Signing.** Firefox build signs with Mozilla as an unlisted add-on. Add two repository secrets (Settings, Secrets and
+variables, Actions): `WEB_EXT_API_KEY` and `WEB_EXT_API_SECRET`, the JWT issuer and JWT secret from
+<https://addons.mozilla.org/developers/addon/api/key/>. Only the signing step can read them; the Chromium workflow and the
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:0bc33450fb56305aaf42e413467102bbd3f91526541b5ea5330d0f663ac9f90c -->
+
+test release use no secrets. Mozilla signs each version number only once. Identical retries compare and reuse the existing
+submission, including waiting for pending approval. Raise `version` in both manifests whenever contents change, development
+builds included. The Chromium zip is not signed.
+
+<!-- /coderabbit-ai-generated:v1 -->
+
+**Safety.** Every action is pinned to a commit SHA. The build job can only read the repository; a short separate job adds
+the files to the release and is the only one that can write. The typed tag goes through an environment variable and is
+validated first. The source archive comes from `git archive`, so it holds exactly the committed files of that revision, and
+the script stops if a tracked file looks like a key or a token. `node --test` checks these rules (`tests/workflows.test.js`).
+
+The packages are reproducible: files carry the time of the last commit, are sorted and have fixed permissions, so the same
+source gives byte-identical `.zip`, `.xpi` and `.tar.gz` files. To make the same archive by hand, run
+`./scripts/build.sh` and then `./scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
 
 ## Testing status
 
-- **Unit and manifest tests:** 15 pass (`node --test`).
+- **Unit, manifest, build, workflow and license tests:** 46 pass (`node --test`).
 - **Chromium build:** run in Chrome for Testing 153 with touch emulation: single, slow and double taps, hold-and-drag, saved
   position, rotation, live settings, a strict-CSP page, keyboard activation, the options page, and both reload fallbacks
-  (38 browser checks). That run was made on the build that is now called 0.1.0-beta. Its `src/` is byte-for-byte the same;
-  only the manifests' version fields, the added `LICENSE` file and the docs differ. The browser suite has not been run again since.
-- **Firefox:** the manifest follows MDN (event-page background, `gecko_android`, `data_collection_permissions`), and the code
-  is the same one that ran in Chromium, but it **has not been run in Firefox or on an Android device yet**. If something
-  misbehaves there, the touch gestures in `src/shared.js` are the first place to look.
+  (38 browser checks). That run was made on the build that is now called 0.1.0-beta. Its `src/` was byte-for-byte the same;
+  since then `src/` has gained only license header comments (no JavaScript changed), a license line with a link on the options
+  page, and icons recompressed without changing a pixel. The browser suite has not been run again since.
+- **Firefox:** the manifest follows MDN (event-page background, `gecko_android`, `data_collection_permissions`) and passes the
+  `web-ext` linter with no warnings. The code is the one that ran in Chromium. The maintainer reports that the 0.1.0 Firefox build
+  works on the latest Waterfox for Android (160); there is no report yet for stock Firefox on Android or on the desktop. If
+  something misbehaves, the touch gestures in `src/shared.js` are the first place to look.
 
 ## Known limitations
 
@@ -196,7 +258,7 @@ checks both rules. To cut a release, change `version` in both manifests (and `ve
 - Firefox lets you revoke an add-on's site access. If the ball disappears everywhere, check Add-ons → Double Tap to Refresh →
   Permissions. Keep the match patterns the same in updates: Firefox does not show newly requested host permissions on update.
 - Screen-reader activation (for example TalkBack's double-tap) hasn't been tried.
-- The add-on ID in `manifests/firefox.json` is a placeholder (`@example.invalid`); replace it before you sign anything.
+- The add-on ID in `manifests/firefox.json` (`double-tap-to-refresh@sumon-kayal`) becomes permanent with the first Mozilla signing.
 - Not in this version: edge snapping, other quick actions, import/export of settings (see `SPEC.md` §9).
 
 ## Reporting a problem
@@ -212,10 +274,11 @@ See [`CHANGELOG.md`](CHANGELOG.md). The current version, **0.1.0-beta**, is the 
 ## License
 
 Double Tap to Refresh is free software, released under the GNU General Public License, version 3 only (`GPL-3.0-only`).
-The full text is in [`LICENSE`](LICENSE), and every package built by `scripts/build.sh` includes a copy.
+The full text is in [`LICENSE.md`](LICENSE.md). Every package built by `scripts/build.sh` includes a copy as `LICENSE.txt`, which the
+options page links to, and every source file carries an SPDX header (`GPL-3.0-only`).
 
 ```
-Copyright (C) 2026 The Double Tap to Refresh authors
+Copyright (C) 2026 Sumon Kayal 
 
 This program is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

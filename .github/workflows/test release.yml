@@ -1,0 +1,73 @@
+# Quick test release: builds both extensions from the branch you pick, with no signing and no secrets.
+#
+# Run it by hand: Actions > Test release > Run workflow ("Use workflow from" picks the branch).
+#
+# scripts/build.sh creates the chromium/ and firefox/ folders, puts the extension's files in each
+# (src/ plus that browser's manifest) together with the license saved as LICENSE.txt, and zips
+# them. When the run finishes, download the two files from its page. They are the extensions
+# themselves, not archives of them, and they are kept for 3 days.
+#
+# The Firefox file is not signed, so Firefox for Android Release and Beta will refuse it (see
+# README.md). The "Firefox build" workflow makes a signed one. The folders are generated and
+# listed in .gitignore, so they never reach the repository.
+name: Test release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build both extensions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Run the tests
+        run: node --test
+
+      - name: Build chromium/ and firefox/
+        id: build
+        run: |
+          set -euo pipefail
+          bash scripts/build.sh
+          chromium=$(ls dist/double-tap-to-refresh-chromium-*.zip)
+          firefox=$(ls dist/double-tap-to-refresh-firefox-*.xpi)
+          { echo "chromium=$chromium"; echo "firefox=$firefox"; } >> "$GITHUB_OUTPUT"
+          {
+            echo '### Test release'
+            echo
+            echo '```'
+            sha256sum "$chromium" "$firefox"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the Chromium extension
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Chromium
+          path: ${{ steps.build.outputs.chromium }}
+          archive: false
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload the Firefox extension (not signed)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Firefox
+          path: ${{ steps.build.outputs.firefox }}
+          archive: false
+          retention-days: 3
+          if-no-files-found: error

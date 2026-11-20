@@ -1,4 +1,13 @@
 /*
+ * Copyright (C) 2026 Sumon Kayal
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * This file is part of Double Tap to Refresh, free software under version 3 of the
+ * GNU General Public License. It comes WITHOUT ANY WARRANTY. The license text is in
+ * LICENSE.md (source) and LICENSE.txt (packages), or at https://www.gnu.org/licenses/.
+ */
+
+/*
  * Double Tap to Refresh — options page.
  * Every change is saved straight away; open pages pick it up through storage.onChanged.
  */

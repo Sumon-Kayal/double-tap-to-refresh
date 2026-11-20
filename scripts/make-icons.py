@@ -4,12 +4,24 @@
 The glyph geometry below is the same one drawn in-page by buildIcon() in
 src/shared.js, so the toolbar icon and the floating ball always match.
 Run it with --paths to print the SVG path strings used by buildIcon().
+
+With the optional pyoxipng package (pip install pyoxipng) the PNGs come out about 40%
+smaller, which is what is committed. The pixels are identical either way; only the
+compression differs.
 """
+import io
 import math
 import os
 import sys
 
 from PIL import Image, ImageDraw
+
+try:
+    import oxipng  # optional: smaller files, same pixels
+except ImportError:
+    oxipng = None
+
+LANCZOS = getattr(Image, "Resampling", Image).LANCZOS  # Pillow 9.1+ also spells it Image.Resampling.LANCZOS
 
 SIZES = (16, 32, 48, 96, 128)
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "icons")
@@ -90,7 +102,23 @@ def render(size):
         g.ellipse((qx - r, qy - r, qx + r, qy + r), fill=WHITE)
     g.polygon([px(p) for p in head], fill=WHITE)
     img = Image.alpha_composite(img, glyph_layer)
-    return img.resize((size, size), Image.LANCZOS)
+    return img.resize((size, size), LANCZOS)
+
+
+def png_bytes(img):
+    """Encode one icon as small as the installed tools allow, without changing a pixel."""
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    data = buf.getvalue()
+    if oxipng is None:
+        return data
+    filters = [getattr(oxipng.RowFilter, name) for name in
+               ("NoOp", "Sub", "Up", "Average", "Paeth", "MinSum", "Entropy", "Bigrams", "BigEnt", "Brute")]
+    smaller = oxipng.optimize_from_memory(
+        data, level=6, filter=filters, optimize_alpha=False,
+        strip=oxipng.StripChunks.safe(), deflate=oxipng.Deflaters.zopfli(15),
+    )
+    return smaller if len(smaller) < len(data) else data
 
 
 def svg_paths():
@@ -111,6 +139,12 @@ if __name__ == "__main__":
         print("HEAD ", head_d)
         sys.exit(0)
     os.makedirs(OUT, exist_ok=True)
+    total = 0
     for s in SIZES:
-        render(s).save(os.path.join(OUT, f"icon{s}.png"), optimize=True)
-    print("wrote", ", ".join(f"icon{s}.png" for s in SIZES))
+        data = png_bytes(render(s))
+        with open(os.path.join(OUT, f"icon{s}.png"), "wb") as f:
+            f.write(data)
+        total += len(data)
+    print("wrote", ", ".join(f"icon{s}.png" for s in SIZES), f"({total} bytes)")
+    if oxipng is None:
+        print("tip: pip install pyoxipng makes the icons about 40% smaller")

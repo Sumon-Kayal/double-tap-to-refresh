@@ -6,6 +6,32 @@ This project is released under **GPL-3.0-only**.
 
 ---
 
+## [Unreleased]
+
+<small>Build, release and licensing work on top of `0.1.0-beta`. The extension's JavaScript is unchanged.</small>
+
+### Added
+
+- GitHub Actions that start by hand only: `chromium.yml` and `firefox.yml` (development and release builds, an optional release tag, the archive `<browser>-<branch>-<mode>-<version>.tar.gz` holding the package and its source, Mozilla signing for Firefox) and `test release.yml` (both extensions as plain downloads, not signed).
+- `.gitignore` for the generated `chromium/`, `firefox/` and `dist/` folders, signing leftovers and secrets.
+- `scripts/make-archive.sh`, which packs a package with the exact committed source (`git archive`) and refuses tracked files that look like keys or tokens, and `scripts/lib.sh` with the helpers both scripts share.
+- Tests for the build scripts, the workflow rules (manual trigger only, pinned actions, least privilege, secrets only in the Firefox signing step, no typed input inside scripts), the license headers and the per-page script size: 46 tests in all.
+- A license line with a link to `LICENSE.txt` on the options page, and an SPDX header (`GPL-3.0-only`) in every source file. The headers are comments; no JavaScript changed.
+
+### Changed
+
+- `scripts/build.sh` saves `LICENSE.md` as `LICENSE.txt` in both builds, builds one browser on request (`build.sh firefox`), gives byte-identical packages for the same source, and names each file after its own manifest, so the Firefox package is `double-tap-to-refresh-firefox-0.1.0.xpi` (it was `-0.1.0-beta.xpi`).
+- `scripts/make-icons.py` can use the optional `pyoxipng` to make the PNGs about 40% smaller, and uses the current Pillow name for LANCZOS.
+- Icons recompressed without changing a pixel: 25.5 KB down to 14.3 KB, so each package is about 11 KB smaller.
+- README and SPEC brought up to date: the real Firefox add-on ID instead of a placeholder, `LICENSE.md`, the per-page script size (about 24 KB), the Waterfox for Android 160 report, and the new scripts and workflows.
+
+### Fixed
+
+- `scripts/build.sh` looked for a file named `LICENSE`, which the repository does not have, so it stopped with "LICENSE is missing".
+- `node --test tests/` fails on Node 22 because a folder argument is no longer expanded; the tests now say to run `node --test`.
+
+---
+
 ## [0.1.0-beta] - 2026-11-19
 
 <small>First beta release. This release contains the complete rebuilt extension and the work that preceded it. Earlier development labels (`1.3.0` and `2.0.0`) are retained only as historical context in this entry; they are not separate releases in this changelog.</small>
