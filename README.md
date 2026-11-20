@@ -271,7 +271,7 @@ The full text is in [`LICENSE.md`](LICENSE.md). Every package built by `scripts/
 options page links to, and every source file carries an SPDX header (`GPL-3.0-only`).
 
 ```
-Copyright (C) 2026 The Double Tap to Refresh authors
+Copyright (C) 2026 Sumon Kayal 
 
 This program is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software
