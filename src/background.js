@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2026 The Double Tap to Refresh authors
+ * Copyright (C) 2026 Sumon Kayal 
  * SPDX-License-Identifier: GPL-3.0-only
  *
  * This file is part of Double Tap to Refresh, free software under version 3 of the
