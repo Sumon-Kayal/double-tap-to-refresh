@@ -31,19 +31,26 @@ class SafeRedirect(HTTPRedirectHandler):
         return redirected
 
 
+def jwt_token():
+    """Create the short-lived AMO token used for an authenticated request."""
+    def encode(value):
+        return base64.urlsafe_b64encode(value).rstrip(b"=")
+
+    now = int(time.time())
+    payload = {"iss": os.environ["WEB_EXT_API_KEY"], "iat": now,
+               "exp": now + 60, "jti": secrets.token_hex(16)}
+    data = encode(b'{"alg":"HS256","typ":"JWT"}') + b"." + encode(json.dumps(payload).encode())
+    signature = hmac.new(os.environ["WEB_EXT_API_SECRET"].encode(), data, hashlib.sha256).digest()
+    return (data + b"." + encode(signature)).decode()
+
+
 def request(url, *, authenticated=True):
-    if urlparse(url).scheme != "https":
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
         raise ValueError("Refusing an insecure Mozilla URL")
     headers = {}
-    if authenticated and urlparse(url).hostname == "addons.mozilla.org":
-        def encode(value):
-            return base64.urlsafe_b64encode(value).rstrip(b"=")
-        now = int(time.time())
-        payload = {"iss": os.environ["WEB_EXT_API_KEY"], "iat": now,
-                   "exp": now + 60, "jti": secrets.token_hex(16)}
-        data = encode(b'{"alg":"HS256","typ":"JWT"}') + b"." + encode(json.dumps(payload).encode())
-        signature = hmac.new(os.environ["WEB_EXT_API_SECRET"].encode(), data, hashlib.sha256).digest()
-        headers["Authorization"] = "JWT " + (data + b"." + encode(signature)).decode()
+    if authenticated and parsed.hostname == "addons.mozilla.org":
+        headers["Authorization"] = "JWT " + jwt_token()
     with build_opener(SafeRedirect()).open(Request(url, headers=headers), timeout=60) as response:
         return response.read()
 
@@ -53,11 +60,11 @@ def verify_payload(data, source):
                 for p in source.rglob("*") if p.is_file()}
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         entries = [entry for entry in archive.infolist() if not entry.is_dir()]
-        names = [entry.filename for entry in entries]
-        if len(names) != len(set(names)):
+        by_name = {entry.filename: entry for entry in entries}
+        if len(entries) != len(by_name):
             raise ValueError("Existing version contains duplicate ZIP entries")
-        actual = {entry.filename: archive.read(entry) for entry in entries
-                  if entry.filename not in SIGNATURES}
+        actual = {name: archive.read(entry) for name, entry in by_name.items()
+                  if name not in SIGNATURES}
     if actual != expected:
         raise ValueError("Existing Mozilla version has different contents; bump the manifest version")
 
