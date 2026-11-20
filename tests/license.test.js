@@ -15,7 +15,7 @@ test('every source file starts with the copyright line and the SPDX identifier',
   assert.ok(sources.length >= 6, 'expected the extension sources');
   for (const name of sources) {
     const head = text('src', name).slice(0, 700);
-    assert.match(head, /Copyright \(C\) 20\d\d The Double Tap to Refresh authors/, `src/${name}: copyright line`);
+    assert.match(head, /Copyright \(C\) 20\d\d Sumon Kayal/, `src/${name}: copyright line`);
     assert.match(head, /SPDX-License-Identifier: GPL-3\.0-only/, `src/${name}: SPDX identifier`);
     assert.doesNotMatch(text('src', name), /GPL-3\.0-or-later/, `src/${name}: the project is GPL-3.0-only`);
   }
@@ -31,7 +31,7 @@ test('README and CHANGELOG name the same license as the source files', () => {
   for (const file of ['README.md', 'CHANGELOG.md']) {
     assert.match(text(file), /GPL-3\.0-only/, `${file} names GPL-3.0-only`);
   }
-  assert.match(text('README.md'), /Copyright \(C\) 20\d\d The Double Tap to Refresh authors/, 'README states the same copyright holder');
+  assert.match(text('README.md'), /Copyright \(C\) 20\d\d Sumon Kayal/, 'README states the same copyright holder');
 });
 
 test('the options page links to LICENSE.txt, and build.sh puts that file in every build', () => {
