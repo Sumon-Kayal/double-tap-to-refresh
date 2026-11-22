@@ -3,7 +3,8 @@
 #
 #   <browser>-<branch>-<mode>-<version>.tar.gz
 #   ├── extension/   chromium.zip  or  firefox-signed.xpi
-#   └── source/      every committed file of this revision (what `git archive HEAD` gives)
+#   └── source/      every committed file of this revision (what `git archive HEAD` gives),
+#                    plus .source-date-epoch
 #
 # Usage: scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>
 #
@@ -16,8 +17,10 @@
 # stdout. Run it from a git checkout. Needs: bash, git, GNU tar, gzip.
 #
 # The source folder comes from git, not from the working tree, so it holds exactly the
-# committed files: no build output, no untracked files, no credentials. The script also
-# refuses to continue if a tracked file looks like a key, a token file or build output.
+# committed files: no build output, no untracked files, no credentials. The one added file,
+# .source-date-epoch, holds the time stamped on the packages: an unpacked archive has no git
+# history, and scripts/lib.sh reads that file so a rebuild gives the same bytes. The script
+# also refuses to continue if a tracked file looks like a key, a token file or build output.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)

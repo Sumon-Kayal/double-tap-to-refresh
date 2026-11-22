@@ -73,7 +73,9 @@ def resume(source=Path("firefox"), destination=Path("dist/firefox-signed.xpi"),
            fetch=request, sleep=time.sleep, clock=time.monotonic):
     manifest = json.loads((source / "manifest.json").read_text())
     addon = manifest["browser_specific_settings"]["gecko"]["id"]
-    url = API + quote(addon, safe="") + "/versions/" + quote(manifest["version"], safe="") + "/"
+    # The API reads a version without a dot as an id; a "v" prefix makes it a lookup by number.
+    lookup = manifest["version"] if "." in manifest["version"] else "v" + manifest["version"]
+    url = API + quote(addon, safe="") + "/versions/" + quote(lookup, safe="") + "/"
     try:
         version = json.loads(fetch(url))
     except HTTPError as error:

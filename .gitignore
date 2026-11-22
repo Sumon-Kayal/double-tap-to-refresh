@@ -9,6 +9,13 @@
 node_modules/
 .web-extension-id
 
+# Python bytecode (the signing tests load a script by path)
+__pycache__/
+*.pyc
+
+# Written into an unpacked source archive so a rebuild gets the same file times
+.source-date-epoch
+
 # Secrets and local settings
 .env
 .env.*
