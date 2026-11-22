@@ -228,3 +228,65 @@ test('source archive rebuilds reproduce the original packages without Git or epo
   assert.equal(build(source, 'chromium').status, 0);
   assert.equal(sha(path.join(source, 'dist', pkg)), original);
 });
+
+// Build a package and prepare it for archive tests.
+function packer(dir, browser = 'chromium') {
+  assert.equal(build(dir, browser).status, 0);
+  const extension = browser === 'chromium' ? '.zip' : '.xpi';
+  const packaged = browser === 'chromium' ? 'chromium.zip' : 'firefox-signed.xpi';
+  const pkg = fs.readdirSync(path.join(dir, 'dist'))
+    .find((n) => n.startsWith(`double-tap-to-refresh-${browser}-`) && n.endsWith(extension));
+  fs.copyFileSync(path.join(dir, 'dist', pkg), path.join(dir, 'dist', packaged));
+  return () => run('bash', ['scripts/make-archive.sh', browser, 'development', 'main', `dist/${packaged}`], dir);
+}
+
+test('make-archive.sh checks working tree cleanliness', { skip: SKIP }, (t) => {
+  const dir = scratch(t, { git: true });
+  let pack = packer(dir);
+  assert.equal(pack().status, 0, 'a clean tree is fine: build output is ignored by git');
+
+  fs.appendFileSync(path.join(dir, 'src', 'shared.js'), '// edited\n');
+  const edited = pack();
+  assert.notEqual(edited.status, 0);
+  assert.match(edited.stderr, /uncommitted changes/);
+  commit(dir, 'edit');
+  pack = packer(dir);
+  assert.equal(pack().status, 0, 'committing the edit makes it fine again');
+
+  fs.writeFileSync(path.join(dir, 'src', 'new.js'), '// git does not know this file yet\n');
+  assert.match(pack().stderr, /uncommitted changes/, 'a new file counts too');
+  fs.rmSync(path.join(dir, 'src', 'new.js'));
+
+  fs.chmodSync(path.join(dir, 'scripts', 'build.sh'), 0o644);
+  assert.equal(pack().status, 0, 'a mode change alone is not a change of content');
+});
+
+test('the secret check also catches token, secret and credential file names in any letter case', { skip: SKIP }, (t) => {
+  const dir = scratch(t, { git: true });
+  const pack = packer(dir);
+  const names = ['api-token.txt', 'credentials.json', 'Secrets.yml', 'deploy.PEM', 'config/.env.production'];
+  for (const name of names) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), 'not a real secret\n');
+  }
+  assert.equal(run('git', ['add', '-f', ...names], dir).status, 0);
+  commit(dir, 'names');
+
+  const refused = pack();
+  assert.notEqual(refused.status, 0);
+  for (const name of names) assert.ok(refused.stderr.includes(name), `${name} should be named in the refusal`);
+  assert.ok(!fs.readdirSync(path.join(dir, 'dist')).some((n) => n.endsWith('.tar.gz')), 'no archive was made');
+});
+
+test('refuse_secret_like_files, which the test release also runs, fails on a committed .env and passes on a clean repo', { skip: SKIP }, (t) => {
+  const dir = scratch(t, { git: true });
+  const check = () => run('bash', ['-c', '. scripts/lib.sh; refuse_secret_like_files'], dir);
+  assert.equal(check().status, 0, check().stderr);
+
+  fs.writeFileSync(path.join(dir, '.env'), 'X=1\n');
+  assert.equal(run('git', ['add', '-f', '.env'], dir).status, 0);
+  commit(dir, 'env');
+  const refused = check();
+  assert.notEqual(refused.status, 0);
+  assert.match(refused.stderr, /\.env/);
+});

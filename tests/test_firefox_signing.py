@@ -52,6 +52,19 @@ class SigningTests(unittest.TestCase):
         self.assertEqual(self.dest.read_bytes(), self.payload)
         self.assertIn('addon%40example.test/versions/1.2.3/', self.calls[0])
 
+    def test_version_without_a_dot_is_looked_up_by_number(self):
+        self.manifest['version'] = '7'
+        (self.source / 'manifest.json').write_text(json.dumps(self.manifest))
+        self.payload = self.zip()
+        found = json.dumps({'version': '7', 'channel': 'unlisted',
+                            'file': {'url': 'https://example.test/addon.xpi', 'status': 'public'}}).encode()
+
+        def fetch(url):
+            self.calls.append(url)
+            return self.payload if url.endswith('.xpi') else found
+        self.assertTrue(signing.resume(self.source, self.dest, fetch=fetch))
+        self.assertTrue(self.calls[0].endswith('/versions/v7/'), self.calls[0])
+
     def test_missing_version_preserves_new_submission_path(self):
         def absent(url):
             raise HTTPError(url, 404, 'absent', {}, None)

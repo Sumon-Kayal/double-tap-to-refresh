@@ -154,8 +154,9 @@ In the options page, *Reset position* puts the ball back at its starting spot (r
 ```
 src/                the extension's code, shared by both browsers (edit here)
 manifests/          chromium.json and firefox.json (the only per-browser differences)
-scripts/            build.sh, make-archive.sh, lib.sh (shared helpers), make-icons.py
-tests/              node --test (no dependencies); tests/e2e/run.js is the optional browser test (needs Playwright)
+scripts/            build.sh, make-archive.sh, lib.sh (shared helpers), resume-firefox-signing.py, make-icons.py
+tests/              node --test (needs no npm packages, only python3 for the signing tests)
+                    tests/e2e/run.js is the optional browser test (needs Playwright)
 .github/workflows/  chromium.yml, firefox.yml, test release.yml (manual runs only)
 chromium/           built output, load unpacked          (generated, in .gitignore)
 firefox/            built output, load or package        (generated, in .gitignore)
@@ -170,8 +171,11 @@ source gives byte-identical packages. Never edit `chromium/` or `firefox/` by ha
 generated and listed in `.gitignore`; if an older commit already tracks them, run `git rm -r --cached chromium firefox` once.
 
 `node --test` (no folder argument; Node 22 was used) runs the unit tests (settings and position maths), checks that the two
-manifests agree, ask for nothing extra and carry a valid version, and checks the build scripts, the workflow rules, the license
-headers and the size of the per-page script. `tests/e2e/run.js` drives the built Chromium extension in a real browser with touch emulation:
+manifests agree, ask for nothing extra and carry a valid version, and checks the build scripts, the workflow rules, the Mozilla
+signing script, the license headers and the size of the per-page script. `tests/docs.test.js` keeps this README and the SPEC in
+step with the code, the manifests, the scripts and the workflows, so a change in one that the other does not follow fails the
+test. The tests need `bash`, `zip`, `unzip`, `git`, GNU `tar` (the build tests skip themselves without them) and `python3`.
+`tests/e2e/run.js` drives the built Chromium extension in a real browser with touch emulation:
 `npm install playwright && npx playwright install chromium`, then `./scripts/build.sh && node tests/e2e/run.js`.
 `python3 scripts/make-icons.py` redraws the icons (needs Pillow; with `pip install pyoxipng` they come out about 40% smaller).
 
@@ -188,12 +192,12 @@ the tag, then run the [workflows](#releases-and-automation) with that tag.
 ## Releases and automation
 
 Three workflows in `.github/workflows/` build the extensions on GitHub. They run **only when you start them by hand**
-(Actions, pick the workflow, *Run workflow*); nothing runs on a push or a pull request. All three build with
-`scripts/build.sh`, so a workflow gives the same files as a local build.
+(Actions, pick the workflow, *Run workflow*); nothing runs on a push or a pull request. All three start with `node --test`
+and build with `scripts/build.sh`, so a workflow gives the same files as a local build.
 
 | Workflow | Use it for | Result |
 |---|---|---|
-| **Test release** (`test release.yml`) | A quick test of any branch | Two plain downloads on the run page, kept 3 days: the Chromium `.zip` and the **unsigned** Firefox `.xpi` |
+| **Test release** (`test release.yml`) | A quick test of any branch | One download on the run page, kept 3 days: `test-release-bundle.tar.gz` with the Chromium `.zip`, the **unsigned** Firefox `.xpi` and two source archives (`source-chrome.tar.gz`, `source-firefox.tar.gz`) |
 | **Chromium build** (`chromium.yml`) | Development and release builds | `chromium-<branch>-<mode>-<version>.tar.gz` |
 | **Firefox build** (`firefox.yml`) | Development and release builds, signed by Mozilla | `firefox-<branch>-<mode>-<version>.tar.gz` |
 
@@ -212,34 +216,40 @@ the browser's manifest, and in `<branch>` any character other than a letter, dig
 ```
 firefox-main-release-0.1.0.tar.gz
 ├── extension/   firefox-signed.xpi   (chromium.zip in the Chromium archive)
-└── source/      the committed files of that exact revision
+└── source/      the committed files of that exact revision, plus .source-date-epoch
 ```
 
-**Signing.** Firefox build signs with Mozilla as an unlisted add-on. Add two repository secrets (Settings, Secrets and
-variables, Actions): `WEB_EXT_API_KEY` and `WEB_EXT_API_SECRET`, the JWT issuer and JWT secret from
+**Signing.** Firefox build is three jobs: *Test, build and lint* (no secrets), *Sign and pack* (the only job that can read
+the secrets) and, for a release, *Add to the GitHub Release* (the only job that can write to the repository). The first job
+hands the built `firefox/` folder to the signing job as a one-day artifact, and the signing job checks out the same commit,
+so a tag that moves in between cannot change what is signed. Signing is as an unlisted add-on. Add two repository secrets
+(Settings, Secrets and variables, Actions): `WEB_EXT_API_KEY` and `WEB_EXT_API_SECRET`, the JWT issuer and JWT secret from
 <https://addons.mozilla.org/developers/addon/api/key/>. Only the signing step can read them; the Chromium workflow and the
-<!-- coderabbit-ai-generated:v1 -->
+test release use no secrets.
 
-<!-- coderabbit-ai-generated-section:v1:0bc33450fb56305aaf42e413467102bbd3f91526541b5ea5330d0f663ac9f90c -->
+Mozilla signs each version number only once. Before submitting, `scripts/resume-firefox-signing.py` asks Mozilla whether this
+version already exists. If it does and its files are identical to this build (Mozilla's own signature files aside), the run
+reuses that submission and waits for approval if it is still pending, so an identical retry works. If the files differ, the run
+stops and asks you to raise `version` in both manifests; do that whenever the contents change, development builds included.
+The Chromium zip is not signed.
 
-test release use no secrets. Mozilla signs each version number only once. Identical retries compare and reuse the existing
-submission, including waiting for pending approval. Raise `version` in both manifests whenever contents change, development
-builds included. The Chromium zip is not signed.
-
-<!-- /coderabbit-ai-generated:v1 -->
-
-**Safety.** Every action is pinned to a commit SHA. The build job can only read the repository; a short separate job adds
-the files to the release and is the only one that can write. The typed tag goes through an environment variable and is
-validated first. The source archive comes from `git archive`, so it holds exactly the committed files of that revision, and
-the script stops if a tracked file looks like a key or a token. `node --test` checks these rules (`tests/workflows.test.js`).
+**Safety.** Every action is pinned to a commit SHA. Only the signing step can read the Mozilla keys, and only the short
+release job can write to the repository (it just adds files to the release). The typed tag goes through an environment
+variable and is validated first. A source archive comes from `git archive`, so it holds exactly the committed files of that
+revision. Before any archive is made, the scripts stop if a committed file's name looks like a key, a token, a credentials
+file or an environment file (the list is `secret_like_files` in `scripts/lib.sh`); the test release runs the same check.
+`node --test` checks these rules (`tests/workflows.test.js`, `tests/build.test.js`).
 
 The packages are reproducible: files carry the time of the last commit, are sorted and have fixed permissions, so the same
-source gives byte-identical `.zip`, `.xpi` and `.tar.gz` files. To make the same archive by hand, run
-`./scripts/build.sh` and then `./scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
+source gives byte-identical `.zip`, `.xpi` and `.tar.gz` files. An archive has no git history, so `make-archive.sh` keeps that
+time in `source/.source-date-epoch`; building from the unpacked source reads it and gives the same files. To make the same
+archive by hand, commit your changes (`make-archive.sh` refuses to run with uncommitted changes, so the source it packs is
+always the source the package was built from), then run `./scripts/build.sh` and then
+`./scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
 
 ## Testing status
 
-- **Unit, manifest, build, workflow and license tests:** 46 pass (`node --test`).
+- **Unit, manifest, build, workflow, signing, license and docs tests:** all pass (`node --test`).
 - **Chromium build:** run in Chrome for Testing 153 with touch emulation: single, slow and double taps, hold-and-drag, saved
   position, rotation, live settings, a strict-CSP page, keyboard activation, the options page, and both reload fallbacks
   (38 browser checks). That run was made on the build that is now called 0.1.0-beta. Its `src/` was byte-for-byte the same;
@@ -278,7 +288,7 @@ The full text is in [`LICENSE.md`](LICENSE.md). Every package built by `scripts/
 options page links to, and every source file carries an SPDX header (`GPL-3.0-only`).
 
 ```
-Copyright (C) 2026 Sumon Kayal 
+Copyright (C) 2026 Sumon Kayal
 
 This program is free software: you can redistribute it and/or modify it under the
 terms of the GNU General Public License as published by the Free Software

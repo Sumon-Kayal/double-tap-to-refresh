@@ -132,12 +132,28 @@ test('the archive name carries browser, branch, mode and version, and the workfl
   }
 });
 
-test('the test release builds both browsers and offers the two extensions as plain downloads', () => {
+test('the test release packs both extensions and two git-archive source archives into one download', () => {
   const t = text('test release.yml');
-  assert.match(t, /bash scripts\/build\.sh\n/);
-  assert.equal((t.match(/archive: false/g) || []).length, 2, 'two single-file artifacts');
+  assert.match(t, /bash scripts\/build\.sh\n/, 'builds both browsers');
   assert.match(t, /double-tap-to-refresh-chromium-\*\.zip/);
   assert.match(t, /double-tap-to-refresh-firefox-\*\.xpi/);
+  assert.equal((t.match(/git archive --format=tar\.gz --output "\$src_(chrome|firefox)" HEAD/g) || []).length, 2, 'two source archives, both from git archive');
+  assert.doesNotMatch(t, /tar -czf "\$src_/, 'a source archive must not be a tar of the working tree (it would hold build output)');
+
+  const bundle = t.split('tar -czf "$bundle"')[1].split('\n\n')[0];
+  for (const member of ['$chromium', '$src_chrome', '$firefox', '$src_firefox']) {
+    assert.ok(bundle.includes(`"$(basename "${member}")"`), `${member} goes into the bundle`);
+  }
+
+  const build = t.split(/^ {6}- name: /m).find((step) => step.startsWith('Build extensions and bundle tarball'));
+  const check = build.indexOf('refuse_secret_like_files');
+  assert.ok(check !== -1 && check < build.indexOf('git archive'), 'the secret-name check runs before the source archives are made');
+
+  assert.equal((t.match(/upload-artifact@/g) || []).length, 1, 'one download');
+  const upload = t.split(/^ {6}- name: /m).find((step) => step.startsWith('Upload test release tarball'));
+  assert.match(upload, /archive: false/);
+  assert.match(upload, /retention-days: 3/);
+  assert.doesNotMatch(upload, /^\s+name:/m, 'with archive: false the artifact is named after the file, so a name would be ignored');
 });
 
 test('Firefox signing uses the verified build commit, even if the release tag moves', () => {

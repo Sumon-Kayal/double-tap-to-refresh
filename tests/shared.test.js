@@ -1,5 +1,5 @@
 'use strict';
-// Dependency-free tests for the pure logic in src/shared.js. Run: node --test tests/
+// Dependency-free tests for the pure logic in src/shared.js. Run: node --test
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

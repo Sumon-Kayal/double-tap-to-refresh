@@ -4,8 +4,10 @@
 #
 # scripts/build.sh creates the chromium/ and firefox/ folders, puts the extension's files in each
 # (src/ plus that browser's manifest) together with the license saved as LICENSE.txt, and zips
-# them. When the run finishes, download the bundle tarball from the workflow run page. It contains
-# the Chromium extension, the unsigned Firefox extension, and two source code archives, kept for 3 days.
+# them. The run then packs one download, test-release-bundle.tar.gz, kept for 3 days: the Chromium
+# zip, the unsigned Firefox xpi and two source archives (source-chrome.tar.gz and
+# source-firefox.tar.gz). Each source archive comes from `git archive`, so it holds exactly the
+# committed files of the revision: no build output, no untracked files.
 #
 # The Firefox file is not signed, so Firefox for Android Release and Beta will refuse it (see
 # README.md). The "Firefox build" workflow makes a signed one. The folders are generated and
@@ -42,16 +44,20 @@ jobs:
         id: build
         run: |
           set -euo pipefail
+          . scripts/lib.sh
+          # The same check the release archives get: no committed key, token or credentials file.
+          refuse_secret_like_files
           bash scripts/build.sh
 
           chromium=$(ls dist/double-tap-to-refresh-chromium-*.zip)
           firefox=$(ls dist/double-tap-to-refresh-firefox-*.xpi)
 
-          # Create two source archives from the checked-out repo (excluding build/git clutter)
+          # Two source archives of exactly the committed files (a tar of the working tree would
+          # also pick up the chromium/ and firefox/ folders that were just built).
           src_chrome="dist/source-chrome.tar.gz"
           src_firefox="dist/source-firefox.tar.gz"
-          tar -czf "$src_chrome" --exclude='./.git' --exclude='./dist' --exclude='./node_modules' .
-          tar -czf "$src_firefox" --exclude='./.git' --exclude='./dist' --exclude='./node_modules' .
+          git archive --format=tar.gz --output "$src_chrome" HEAD
+          git archive --format=tar.gz --output "$src_firefox" HEAD
 
           bundle="dist/test-release-bundle.tar.gz"
           tar -czf "$bundle" -C dist \
@@ -69,10 +75,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # archive: false uploads the tarball itself, and the artifact is named after the file
+      # (a name given here would be ignored).
       - name: Upload test release tarball
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: Test-release-bundle
           path: ${{ steps.build.outputs.bundle }}
           archive: false
           retention-days: 3
