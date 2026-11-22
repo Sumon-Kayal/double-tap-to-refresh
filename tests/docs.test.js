@@ -131,8 +131,8 @@ test('what the SPEC says about the page, the network and the code is true of the
 });
 
 test('every script is named in README, and README shows the usage the scripts print', () => {
-  for (const file of fs.readdirSync(path.join(ROOT, 'scripts'))) {
-    assert.ok(README.includes(file), `README should name scripts/${file}`);
+  for (const entry of fs.readdirSync(path.join(ROOT, 'scripts'), { withFileTypes: true })) {
+    if (entry.isFile()) assert.ok(README.includes(entry.name), `README should name scripts/${entry.name}`); // not a stray __pycache__/
   }
   const build = /echo "usage: scripts\/build\.sh (.+?)" >&2/.exec(read('scripts', 'build.sh'))[1];
   const archive = /echo "usage: scripts\/make-archive\.sh (.+?)" >&2/.exec(read('scripts', 'make-archive.sh'))[1];
@@ -149,6 +149,12 @@ test('every script is named in README, and README shows the usage the scripts pr
   }
   if (read('scripts', 'lib.sh').includes('.source-date-epoch')) {
     assert.ok(README.includes('.source-date-epoch'), 'README should explain .source-date-epoch');
+  }
+  if (read('scripts', 'lib.sh').includes('secret_like_files()')) {
+    assert.ok(README.includes('secret_like_files'), 'README should say where the list of secret-like names lives');
+  }
+  if (makeArchive.includes('uncommitted changes')) {
+    assert.ok(README.includes('uncommitted changes'), 'README should say that make-archive.sh needs a committed tree');
   }
 });
 

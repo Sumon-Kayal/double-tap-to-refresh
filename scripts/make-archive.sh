@@ -14,13 +14,15 @@
 #   version   read from manifests/<browser>.json
 #
 # The archive is written to dist/ (or $OUT_DIR) and its path is the only thing printed on
-# stdout. Run it from a git checkout. Needs: bash, git, GNU tar, gzip.
+# stdout. Run it from a git checkout with nothing uncommitted: the package was built from the
+# working tree and the source comes from git, so the two must be the same. Needs: bash, git, GNU tar, gzip.
 #
 # The source folder comes from git, not from the working tree, so it holds exactly the
 # committed files: no build output, no untracked files, no credentials. The one added file,
 # .source-date-epoch, holds the time stamped on the packages: an unpacked archive has no git
 # history, and scripts/lib.sh reads that file so a rebuild gives the same bytes. The script
-# also refuses to continue if a tracked file looks like a key, a token file or build output.
+# also refuses to continue if a committed file's name looks like a key, a token or credentials file,
+# an environment file or build output (secret_like_files in scripts/lib.sh).
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd -P)
@@ -50,6 +52,10 @@ esac
 
 [ -f "$package" ] || die "package not found: $package"
 git rev-parse --verify --quiet HEAD >/dev/null || die "run this inside a git checkout that has at least one commit"
+# A mode change alone is not a content change (it shows up on file systems without exec bits).
+[ -z "$(git -c core.fileMode=false status --porcelain)" ] ||
+  die "the working tree has uncommitted changes. Commit or stash them first, so the source in the archive is the source the package was built from."
+refuse_secret_like_files
 
 version=$(manifest_value "manifests/$browser.json" version)
 [ -n "$version" ] || die "could not read \"version\" from manifests/$browser.json"
@@ -66,14 +72,6 @@ mkdir "$stage/extension" "$stage/source"
 cp "$package" "$stage/extension/$packaged_as"
 git archive --format=tar HEAD | tar -x -C "$stage/source"
 printf '%s\n' "$epoch" > "$stage/source/.source-date-epoch"
-
-leaks=$(cd "$stage/source" && find . -type f \( \
-  -name '.env' -o -name '.env.*' -o -name '.npmrc' -o -name '.web-extension-id' \
-  -o -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' -o -name '*.jks' -o -name '*.keystore' \
-  -o -name 'id_rsa*' -o -name 'id_ed25519*' -o -name '*.xpi' -o -name '*.crx' \
-  -o -path '*/web-ext-artifacts/*' \) -print | LC_ALL=C sort)
-[ -z "$leaks" ] || die "these tracked files look like secrets or build output; remove them from git first:
-$leaks"
 
 chmod -R u=rwX,go=rX "$stage" # modes must not depend on the umask of whoever runs this
 mkdir -p "$out_dir"

@@ -145,6 +145,10 @@ test('the test release packs both extensions and two git-archive source archives
     assert.ok(bundle.includes(`"$(basename "${member}")"`), `${member} goes into the bundle`);
   }
 
+  const build = t.split(/^ {6}- name: /m).find((step) => step.startsWith('Build extensions and bundle tarball'));
+  const check = build.indexOf('refuse_secret_like_files');
+  assert.ok(check !== -1 && check < build.indexOf('git archive'), 'the secret-name check runs before the source archives are made');
+
   assert.equal((t.match(/upload-artifact@/g) || []).length, 1, 'one download');
   const upload = t.split(/^ {6}- name: /m).find((step) => step.startsWith('Upload test release tarball'));
   assert.match(upload, /archive: false/);

@@ -235,14 +235,16 @@ The Chromium zip is not signed.
 
 **Safety.** Every action is pinned to a commit SHA. Only the signing step can read the Mozilla keys, and only the short
 release job can write to the repository (it just adds files to the release). The typed tag goes through an environment
-variable and is validated first. The source archive comes from `git archive`, so it holds exactly the committed files of
-that revision, and the script stops if a tracked file looks like a key or a token. `node --test` checks these rules
-(`tests/workflows.test.js`).
+variable and is validated first. A source archive comes from `git archive`, so it holds exactly the committed files of that
+revision. Before any archive is made, the scripts stop if a committed file's name looks like a key, a token, a credentials
+file or an environment file (the list is `secret_like_files` in `scripts/lib.sh`); the test release runs the same check.
+`node --test` checks these rules (`tests/workflows.test.js`, `tests/build.test.js`).
 
 The packages are reproducible: files carry the time of the last commit, are sorted and have fixed permissions, so the same
 source gives byte-identical `.zip`, `.xpi` and `.tar.gz` files. An archive has no git history, so `make-archive.sh` keeps that
 time in `source/.source-date-epoch`; building from the unpacked source reads it and gives the same files. To make the same
-archive by hand, run `./scripts/build.sh` and then
+archive by hand, commit your changes (`make-archive.sh` refuses to run with uncommitted changes, so the source it packs is
+always the source the package was built from), then run `./scripts/build.sh` and then
 `./scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
 
 ## Testing status

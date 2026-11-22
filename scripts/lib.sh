@@ -30,3 +30,28 @@ source_epoch() {
     printf '%s\n' 1767225600 # 2026-01-01 00:00:00 UTC
   fi
 }
+
+# secret_like_files
+# Lists the files committed in HEAD whose names look like keys, tokens, credentials, environment files or
+# build output, which must never travel in a source archive. One path per line; nothing when all is well.
+# It judges names only (a heuristic, not a scanner), in any letter case.
+secret_like_files() {
+  git ls-tree -r -z --name-only HEAD | while IFS= read -r -d '' file; do
+    case "/${file,,}" in
+      */.env | */.env.* | */.npmrc | */.web-extension-id | */web-ext-artifacts/* \
+        | *.pem | *.key | *.p12 | *.pfx | *.jks | *.keystore | */id_rsa* | */id_ed25519* | *.xpi | *.crx \
+        | *token* | *secret* | *credential*)
+        printf '%s\n' "$file"
+        ;;
+    esac
+  done
+}
+
+# refuse_secret_like_files
+# Stops the calling script when secret_like_files finds anything.
+refuse_secret_like_files() {
+  local found
+  found=$(secret_like_files | LC_ALL=C sort)
+  [ -z "$found" ] || die "these committed files look like secrets or build output; remove them from git first:
+$found"
+}

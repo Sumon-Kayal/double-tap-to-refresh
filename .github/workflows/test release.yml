@@ -44,6 +44,9 @@ jobs:
         id: build
         run: |
           set -euo pipefail
+          . scripts/lib.sh
+          # The same check the release archives get: no committed key, token or credentials file.
+          refuse_secret_like_files
           bash scripts/build.sh
 
           chromium=$(ls dist/double-tap-to-refresh-chromium-*.zip)
