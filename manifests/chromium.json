@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Double Tap to Refresh",
   "version": "0.1.0",
-  "version_name": "0.1.0-beta",
+  "version_name": "0.1.1-beta",
   "description": "A floating, draggable refresh button. Double-tap it to reload the page.",
   "minimum_chrome_version": "152",
   "icons": {
