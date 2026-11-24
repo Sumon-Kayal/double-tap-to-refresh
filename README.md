@@ -4,8 +4,9 @@ A small floating ball, inspired by Xiaomi's MIUI Quick Ball, that you can park a
 **Double-tap it to reload the page. Press, hold, then drag to move it.** Built for Firefox on Android first,
 and it also runs on Chromium.
 
-> **Beta (0.1.0-beta).** The Chromium build has been tested in a real browser. The Firefox build is reported working on
-> Waterfox for Android 160 but has no automated browser test, so expect rough edges. See [Testing status](#testing-status).
+> **Beta (0.1.0-beta).** Both builds pass the maintainer's browser testing on Android: the Firefox build in Waterfox and Fennec
+> F-Droid, the Chromium build in Cromite. Only the Chromium build also has an automated browser test. See
+> [Testing status](#testing-status).
 
 | | |
 |---|---|
@@ -43,10 +44,10 @@ Then open any web page and double-tap the ball.
 
 | Browser | Minimum | Build | Notes |
 |---|---|---|---|
-| Firefox for Android | 160 | `firefox/` | Primary target. See [Firefox for Android](#firefox-for-android) for installing. |
+| Firefox for Android | 160 | `firefox/` | Primary target. Tested in Waterfox and Fennec F-Droid. See [Firefox for Android](#firefox-for-android) for installing. |
 | Firefox desktop | 160 | `firefox/` | Same build. |
 | Chromium desktop (Chrome, Edge, Brave, …) | 152 | `chromium/` | |
-| Chromium on Android | 152 | `chromium/` | Only browsers that can load Chrome extensions. Not tested. |
+| Chromium on Android | 152 | `chromium/` | Only browsers that can load Chrome extensions. Tested in Cromite. |
 | Firefox Focus | — | — | Firefox Focus has no extension support. |
 
 The minimums are `strict_min_version` in `manifests/firefox.json` and `minimum_chrome_version` in
@@ -71,9 +72,10 @@ Firefox runs extensions in private windows only if you allow it (Add-ons → Dou
 
 ## Install
 
-`./scripts/build.sh` puts the packages in `dist/` (`double-tap-to-refresh-chromium-0.1.0-beta.zip` and
-`double-tap-to-refresh-firefox-0.1.0.xpi`) and the unpacked builds in `chromium/` and `firefox/`. No computer at hand? The
-[Test release workflow](#releases-and-automation) builds both on GitHub and lets you download them.
+`bash scripts/build.sh` puts the packages in `dist/` (`double-tap-to-refresh-chromium-0.1.0-beta.zip` and
+`double-tap-to-refresh-firefox-0.1.0.xpi`) and the unpacked builds in `chromium/` and `firefox/`. Step-by-step instructions
+for Ubuntu, Debian, openSUSE, Arch, Fedora, macOS, Windows and Termux are in [BUILDING.md](BUILDING.md). No computer at hand?
+The [Test release workflow](#releases-and-automation) builds both on GitHub and lets you download them.
 Chromium shows the version as `0.1.0-beta`; Firefox shows `0.1.0` (see [Version numbers](#version-numbers)).
 
 ### Chromium
@@ -115,7 +117,7 @@ Release and Beta builds only run add-ons that Mozilla has signed, so there are t
 
 1. The add-on ID in `manifests/firefox.json` (`double-tap-to-refresh@sumon-kayal`) becomes permanent with the first
    signing, so change it now if you want a different one.
-2. `./scripts/build.sh firefox`, then
+2. `bash scripts/build.sh firefox`, then
    `web-ext sign --channel=unlisted --source-dir=firefox --api-key=<key> --api-secret=<secret>`
    (keys come from your addons.mozilla.org developer account). This writes a signed `.xpi` to `web-ext-artifacts/`.
    The [Firefox build workflow](#releases-and-automation) does the same on GitHub, with the keys stored as secrets.
@@ -158,6 +160,8 @@ scripts/            build.sh, make-archive.sh, lib.sh (shared helpers), resume-f
 tests/              node --test (needs no npm packages, only python3 for the signing tests)
                     tests/e2e/run.js is the optional browser test (needs Playwright)
 .github/workflows/  chromium.yml, firefox.yml, test release.yml (manual runs only)
+BUILDING.md         how to build, test and package it
+docs/building/      linux.md (Ubuntu, Debian, openSUSE, Arch, Fedora), macos.md, windows.md, termux.md
 chromium/           built output, load unpacked          (generated, in .gitignore)
 firefox/            built output, load or package        (generated, in .gitignore)
 dist/               zip and unsigned xpi of the builds   (generated, in .gitignore)
@@ -165,18 +169,19 @@ LICENSE.md          GNU General Public License, version 3 (saved as LICENSE.txt 
 CHANGELOG.md        what changed in each version
 ```
 
-`./scripts/build.sh [chromium|firefox|all]` rebuilds `chromium/`, `firefox/` and `dist/` from `src/`, `manifests/` and
-`LICENSE.md`, which each build gets as `LICENSE.txt`. It needs `bash` and `zip` (Termux: `pkg install zip`), and the same
-source gives byte-identical packages. Never edit `chromium/` or `firefox/` by hand; the next build overwrites them. They are
-generated and listed in `.gitignore`; if an older commit already tracks them, run `git rm -r --cached chromium firefox` once.
+`bash scripts/build.sh [chromium|firefox|all]` rebuilds `chromium/`, `firefox/` and `dist/` from `src/`, `manifests/` and
+`LICENSE.md`, which each build gets as `LICENSE.txt`. The same source gives byte-identical packages. Never edit `chromium/` or
+`firefox/` by hand; the next build overwrites them. They are generated and listed in `.gitignore`; if an older commit already
+tracks them, run `git rm -r --cached chromium firefox` once. Run the scripts with `bash`, because a fresh clone may not have the
+executable bit set. The tools you need, and the steps for each system, are in [BUILDING.md](BUILDING.md).
 
-`node --test` (no folder argument; Node 22 was used) runs the unit tests (settings and position maths), checks that the two
+`node --test` (no folder argument; checked on Node 18, 20, 22 and 24) runs the unit tests (settings and position maths), checks that the two
 manifests agree, ask for nothing extra and carry a valid version, and checks the build scripts, the workflow rules, the Mozilla
 signing script, the license headers and the size of the per-page script. `tests/docs.test.js` keeps this README and the SPEC in
 step with the code, the manifests, the scripts and the workflows, so a change in one that the other does not follow fails the
 test. The tests need `bash`, `zip`, `unzip`, `git`, GNU `tar` (the build tests skip themselves without them) and `python3`.
 `tests/e2e/run.js` drives the built Chromium extension in a real browser with touch emulation:
-`npm install playwright && npx playwright install chromium`, then `./scripts/build.sh && node tests/e2e/run.js`.
+`npm install playwright && npx playwright install chromium`, then `bash scripts/build.sh && node tests/e2e/run.js`.
 `python3 scripts/make-icons.py` redraws the icons (needs Pillow; with `pip install pyoxipng` they come out about 40% smaller).
 
 ### Version numbers
@@ -244,21 +249,25 @@ The packages are reproducible: files carry the time of the last commit, are sort
 source gives byte-identical `.zip`, `.xpi` and `.tar.gz` files. An archive has no git history, so `make-archive.sh` keeps that
 time in `source/.source-date-epoch`; building from the unpacked source reads it and gives the same files. To make the same
 archive by hand, commit your changes (`make-archive.sh` refuses to run with uncommitted changes, so the source it packs is
-always the source the package was built from), then run `./scripts/build.sh` and then
-`./scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
+always the source the package was built from), then run `bash scripts/build.sh` and then
+`bash scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>`.
 
 ## Testing status
 
 - **Unit, manifest, build, workflow, signing, license and docs tests:** all pass (`node --test`).
-- **Chromium build:** run in Chrome for Testing 153 with touch emulation: single, slow and double taps, hold-and-drag, saved
+- **By hand, on Android:** the maintainer reports that the extension passes browser testing in **Waterfox** (160) and
+  **Fennec F-Droid** with the Firefox build, and in **Cromite** with the Chromium build. These browsers refuse an extension
+  whose minimum version is higher than theirs, so the versions tested meet the minimums under
+  [Compatibility](#compatibility).
+- **Chromium build, automated:** run in Chrome for Testing 153 with touch emulation: single, slow and double taps, hold-and-drag, saved
   position, rotation, live settings, a strict-CSP page, keyboard activation, the options page, and both reload fallbacks
   (38 browser checks). That run was made on the build that is now called 0.1.0-beta. Its `src/` was byte-for-byte the same;
   since then `src/` has gained only license header comments (no JavaScript changed), a license line with a link on the options
   page, and icons recompressed without changing a pixel. The browser suite has not been run again since.
-- **Firefox:** the manifest follows MDN (event-page background, `gecko_android`, `data_collection_permissions`) and passes the
-  `web-ext` linter with no warnings. The code is the one that ran in Chromium. The maintainer reports that the 0.1.0 Firefox build
-  works on the latest Waterfox for Android (160); there is no report yet for stock Firefox on Android or on the desktop. If
-  something misbehaves, the touch gestures in `src/shared.js` are the first place to look.
+- **Firefox build:** the manifest follows MDN (event-page background, `gecko_android`, `data_collection_permissions`) and passes
+  the `web-ext` linter with no warnings. The code is the one that ran in Chromium. There is no report yet for Mozilla's own
+  Firefox builds, on Android or on the desktop. If something misbehaves, the touch gestures in `src/shared.js` are the first
+  place to look.
 
 ## Known limitations
 
