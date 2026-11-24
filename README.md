@@ -80,8 +80,16 @@ Chromium shows the version as `0.1.0-beta`; Firefox shows `0.1.0` (see [Version 
 
 ### Chromium
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:9453ba61808bd14943c70cbd330e29ffc8a659e1d8ee57ea06d3e9ecfdba848d -->
+
+In Cromite, first go to **Settings → Developer options**, turn on **Enable Extensions**, and restart the browser.
+
 Open `chrome://extensions`, turn on **Developer mode**, choose **Load unpacked** and pick the `chromium/` folder
 (or the folder you get by unzipping the `.zip` from `dist/`).
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ### Firefox desktop
 

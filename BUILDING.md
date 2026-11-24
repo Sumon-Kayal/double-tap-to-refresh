@@ -75,9 +75,19 @@ Playwright; see [Testing status](README.md#testing-status) in the README.
 
 ## Source archives, signing and releases
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:c3c1bda79eff70e56ed0309c5375f6bca189b3154cb46a7c3dc6cbff1904bd74 -->
+
 `bash scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <package>` packs a package together with
 the source it was built from. It needs a git checkout with nothing uncommitted. The GitHub workflows do this, and the Mozilla
 signing, for you; see [Releases and automation](README.md#releases-and-automation) in the README.
+
+If the script reports uncommitted changes, commit or stash them, then run `bash scripts/build.sh` from the final clean
+checkout. Replace the old package with the rebuilt one (sign the rebuilt package again if signing is required), then
+rerun `make-archive.sh` with the replacement package.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Redraw the icons
 
@@ -95,6 +105,6 @@ which is what is committed.
 | `bad substitution` in `scripts/lib.sh` | `bash` is older than 4 | install a newer `bash` (macOS: see its guide) |
 | `touch` or `tar` rejects `-d @…` or `--sort` | BSD or BusyBox tools instead of GNU ones | install GNU coreutils and tar (macOS: see its guide) |
 | `node --test tests/` says `Cannot find module` | Node 22 and newer do not expand a folder | run `node --test` with no argument |
-| `error: the working tree has uncommitted changes` | `make-archive.sh` packs the committed source | commit or stash your changes |
+| `error: the working tree has uncommitted changes` | `make-archive.sh` packs the committed source | [follow the archive recovery steps](#source-archives-signing-and-releases) |
 | `error: run this inside a git checkout that has at least one commit` | there is no git history | use a `git clone` |
 | `error: these committed files look like secrets or build output` | a committed file has a name like a key or token file | remove it from git |

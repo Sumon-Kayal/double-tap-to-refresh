@@ -234,14 +234,15 @@ function packer(dir, browser = 'chromium') {
   assert.equal(build(dir, browser).status, 0);
   const extension = browser === 'chromium' ? '.zip' : '.xpi';
   const packaged = browser === 'chromium' ? 'chromium.zip' : 'firefox-signed.xpi';
-  const pkg = fs.readdirSync(path.join(dir, 'dist')).find((n) => n.endsWith(extension));
+  const pkg = fs.readdirSync(path.join(dir, 'dist'))
+    .find((n) => n.startsWith(`double-tap-to-refresh-${browser}-`) && n.endsWith(extension));
   fs.copyFileSync(path.join(dir, 'dist', pkg), path.join(dir, 'dist', packaged));
   return () => run('bash', ['scripts/make-archive.sh', browser, 'development', 'main', `dist/${packaged}`], dir);
 }
 
-test('make-archive.sh refuses uncommitted changes, so the source is always the source of the package', { skip: SKIP }, (t) => {
+test('make-archive.sh refuses uncommitted changes and accepts a package rebuilt after commit', { skip: SKIP }, (t) => {
   const dir = scratch(t, { git: true });
-  const pack = packer(dir);
+  let pack = packer(dir);
   assert.equal(pack().status, 0, 'a clean tree is fine: build output is ignored by git');
 
   fs.appendFileSync(path.join(dir, 'src', 'shared.js'), '// edited\n');
@@ -249,7 +250,11 @@ test('make-archive.sh refuses uncommitted changes, so the source is always the s
   assert.notEqual(edited.status, 0);
   assert.match(edited.stderr, /uncommitted changes/);
   commit(dir, 'edit');
-  assert.equal(pack().status, 0, 'committing the edit makes it fine again');
+  pack = packer(dir);
+  const rebuilt = run('unzip', ['-p', 'dist/chromium.zip', 'shared.js'], dir);
+  assert.equal(rebuilt.status, 0, rebuilt.stderr);
+  assert.equal(rebuilt.stdout, run('git', ['show', 'HEAD:src/shared.js'], dir).stdout);
+  assert.equal(pack().status, 0, 'the rebuilt package can be archived with the committed edit');
 
   fs.writeFileSync(path.join(dir, 'src', 'new.js'), '// git does not know this file yet\n');
   assert.match(pack().stderr, /uncommitted changes/, 'a new file counts too');

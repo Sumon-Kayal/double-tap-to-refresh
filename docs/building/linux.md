@@ -13,7 +13,15 @@ sudo apt update
 sudo apt install git zip unzip python3 nodejs
 ```
 
-Ubuntu's own `nodejs` is enough for the tests, which pass on Node 18 and newer. Check with `node --version`.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d2d20d51a7b4129d2417be7caa0d207dd19ba7f5ff2d483fa887c9980bbda441 -->
+
+The tests require Node.js 18 or newer. Check with `node --version` after installing Ubuntu's `nodejs` package.
+If it reports an older version, follow the [Node.js installation instructions](https://nodejs.org/en/download) for
+Linux to install a current LTS release, then check `node --version` again before running the tests.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Debian
 
