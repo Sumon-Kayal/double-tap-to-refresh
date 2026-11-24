@@ -50,7 +50,7 @@ bash scripts/build.sh
 
 Run the scripts with `bash`: a fresh clone may not have the executable bit set, and then `./scripts/build.sh` says
 `Permission denied`. The build prints one line per browser, for example
-`Built firefox 0.1.0 (version 0.1.0): firefox/ and dist/double-tap-to-refresh-firefox-0.1.0.xpi (… bytes)`.
+`Built firefox 0.1.1 (version 0.1.1): firefox/ and dist/double-tap-to-refresh-firefox-0.1.1.xpi (… bytes)`.
 Build one browser with `bash scripts/build.sh chromium` or `bash scripts/build.sh firefox`.
 
 ## Run the tests

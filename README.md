@@ -231,11 +231,19 @@ Firefox has no such field here, so it shows `0.1.1`. `build.sh` names each file 
 
 To cut a release:
 
-1. Change `version` in both manifests (and `version_name` in the Chromium one).
-2. Add an entry to `CHANGELOG.md`.
-3. Tag the commit.
-4. Create the GitHub Release for the tag.
-5. Run the [workflows](#releases-and-automation) with that tag.
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:76f38ce387945af5cfe1f6df3001ec823a27795fe67099f4ed3d216ece9d8600 -->
+
+1. Set `version` in both manifests and `version_name` in the Chromium manifest.
+2. Update this README's version table, displayed browser versions, package names and other version references to match
+   the manifests; update the build example in [BUILDING.md](BUILDING.md) too.
+3. Document the release in `CHANGELOG.md`.
+4. Commit the changes and create a tag.
+5. Create a GitHub Release for the tag.
+6. Start the [release workflows](#releases-and-automation) with that tag.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Releases and automation
 
