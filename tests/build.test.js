@@ -229,7 +229,7 @@ test('source archive rebuilds reproduce the original packages without Git or epo
   assert.equal(sha(path.join(source, 'dist', pkg)), original);
 });
 
-// Build a package and prepare it for archive tests.
+// A package built from the working tree must travel with the source it was built from.
 function packer(dir, browser = 'chromium') {
   assert.equal(build(dir, browser).status, 0);
   const extension = browser === 'chromium' ? '.zip' : '.xpi';
@@ -240,7 +240,7 @@ function packer(dir, browser = 'chromium') {
   return () => run('bash', ['scripts/make-archive.sh', browser, 'development', 'main', `dist/${packaged}`], dir);
 }
 
-test('make-archive.sh checks working tree cleanliness', { skip: SKIP }, (t) => {
+test('make-archive.sh refuses uncommitted changes and accepts a package rebuilt after commit', { skip: SKIP }, (t) => {
   const dir = scratch(t, { git: true });
   let pack = packer(dir);
   assert.equal(pack().status, 0, 'a clean tree is fine: build output is ignored by git');
@@ -251,7 +251,10 @@ test('make-archive.sh checks working tree cleanliness', { skip: SKIP }, (t) => {
   assert.match(edited.stderr, /uncommitted changes/);
   commit(dir, 'edit');
   pack = packer(dir);
-  assert.equal(pack().status, 0, 'committing the edit makes it fine again');
+  const rebuilt = run('unzip', ['-p', 'dist/chromium.zip', 'shared.js'], dir);
+  assert.equal(rebuilt.status, 0, rebuilt.stderr);
+  assert.equal(rebuilt.stdout, run('git', ['show', 'HEAD:src/shared.js'], dir).stdout);
+  assert.equal(pack().status, 0, 'the rebuilt package can be archived with the committed edit');
 
   fs.writeFileSync(path.join(dir, 'src', 'new.js'), '// git does not know this file yet\n');
   assert.match(pack().stderr, /uncommitted changes/, 'a new file counts too');

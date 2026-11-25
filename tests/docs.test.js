@@ -1,7 +1,8 @@
 'use strict';
-// README.md and SPEC.md say things about the code, the manifests, the scripts and the workflows. Each test here takes
-// one of those claims and checks it against the thing it describes, so a change that the other side does not follow
-// fails. Nothing here starts a browser, and CHANGELOG.md is only read for the headings that README links to.
+// The docs (README.md, SPEC.md, BUILDING.md and docs/building/) say things about the code, the manifests, the scripts and
+// the workflows. Each test here takes one of those claims and checks it against the thing it describes, so a change that
+// the other side does not follow fails. Nothing here starts a browser, and CHANGELOG.md is only read for the headings
+// that the docs link to.
 // Run: node --test
 
 const test = require('node:test');
@@ -22,6 +23,10 @@ const gecko = firefox.browser_specific_settings.gecko;
 const geckoAndroid = firefox.browser_specific_settings.gecko_android;
 const WORKFLOWS = fs.readdirSync(path.join(ROOT, '.github', 'workflows')).filter((f) => f.endsWith('.yml')).sort();
 const workflow = (file) => read('.github', 'workflows', file);
+const BUILDING = read('BUILDING.md');
+const GUIDES = fs.readdirSync(path.join(ROOT, 'docs', 'building')).filter((f) => f.endsWith('.md')).sort();
+const DOC_FILES = ['README.md', 'SPEC.md', 'BUILDING.md', ...GUIDES.map((f) => `docs/building/${f}`)];
+const docText = (file) => read(...file.split('/'));
 
 const context = vm.createContext({ chrome: {} });
 vm.runInContext(SHARED, context, { filename: 'shared.js' });
@@ -136,8 +141,10 @@ test('every script is named in README, and README shows the usage the scripts pr
   }
   const build = /echo "usage: scripts\/build\.sh (.+?)" >&2/.exec(read('scripts', 'build.sh'))[1];
   const archive = /echo "usage: scripts\/make-archive\.sh (.+?)" >&2/.exec(read('scripts', 'make-archive.sh'))[1];
-  assert.ok(README.includes(`./scripts/build.sh ${build}`), `README should show ./scripts/build.sh ${build}`);
-  assert.ok(README.includes(`./scripts/make-archive.sh ${archive}`), `README should show ./scripts/make-archive.sh ${archive}`);
+  for (const [name, doc] of [['README', README], ['BUILDING.md', BUILDING]]) {
+    assert.ok(doc.includes(`bash scripts/build.sh ${build}`), `${name} should show bash scripts/build.sh ${build}`);
+    assert.ok(doc.includes(`bash scripts/make-archive.sh ${archive}`), `${name} should show bash scripts/make-archive.sh ${archive}`);
+  }
 
   const makeArchive = read('scripts', 'make-archive.sh');
   assert.ok(makeArchive.includes('$browser-$safe_branch-$mode-$version.tar.gz'), 'the archive is named <browser>-<branch>-<mode>-<version>.tar.gz');
@@ -193,16 +200,21 @@ test('README describes the workflows as they are: names, jobs, secrets, artifact
   assert.ok(README.includes('**tag**'), 'README should explain the tag input');
 });
 
-test('every repo path named in README and SPEC exists', () => {
+test('every repo path named in the docs exists', () => {
   const missing = [];
-  for (const [file, text] of [['README.md', README], ['SPEC.md', SPEC]]) {
-    for (const [, token] of text.matchAll(/`([^`\n]+)`/g)) {
-      const name = token.replace(/^\.\//, '');
-      const isPath = /^(src|scripts|tests|manifests|\.github)\/[\w./-]*$/.test(name) || /^(LICENSE|CHANGELOG|README|SPEC)\.md$/.test(name);
+  for (const file of DOC_FILES) {
+    const text = docText(file);
+    const named = [
+      ...[...text.matchAll(/`([^`\n]+)`/g)].map((m) => m[1]), // `src/shared.js`
+      ...[...text.matchAll(/(?<![\w./:-])((?:src|scripts|tests|manifests|docs|\.github)\/[\w.\-/]*)/g)].map((m) => m[1]), // bash scripts/build.sh
+    ];
+    for (const token of named) {
+      const name = token.replace(/^\.\//, '').replace(/[.,:;]+$/, '');
+      const isPath = /^(src|scripts|tests|manifests|docs|\.github)\/[\w./-]*$/.test(name) || /^(LICENSE|CHANGELOG|README|SPEC|BUILDING)\.md$/.test(name);
       if (isPath && !fs.existsSync(path.join(ROOT, name))) missing.push(`${file}: ${token}`);
     }
   }
-  assert.deepEqual(missing, []);
+  assert.deepEqual([...new Set(missing)], []);
 });
 
 test('the README project layout lists real paths and the main folders', () => {
@@ -214,7 +226,8 @@ test('the README project layout lists real paths and the main folders', () => {
     if (!generated.includes(entry)) assert.ok(fs.existsSync(path.join(ROOT, entry)), `${entry} is listed but does not exist`);
   }
   const tops = new Set(listed.map((entry) => entry.split('/')[0]));
-  for (const folder of ['src', 'manifests', 'scripts', 'tests', '.github']) assert.ok(tops.has(folder), `${folder}/ should be in the layout`);
+  for (const folder of ['src', 'manifests', 'scripts', 'tests', '.github', 'docs', 'BUILDING.md']) assert.ok(tops.has(folder), `${folder} should be in the layout`);
+  for (const guide of GUIDES) assert.ok(block.includes(guide), `the layout should name docs/building/${guide}`);
 });
 
 // GitHub's heading anchors: lower case, formatting and punctuation dropped, spaces to hyphens, repeats numbered.
@@ -246,17 +259,78 @@ function anchors(text) {
   return found;
 }
 
-test('every relative link and heading anchor in README and SPEC resolves', () => {
-  const headings = { 'README.md': anchors(README), 'SPEC.md': anchors(SPEC), 'CHANGELOG.md': anchors(read('CHANGELOG.md')) };
+test('every relative link and heading anchor in the docs resolves', () => {
+  const headings = new Map();
+  const headingsOf = (file) => {
+    if (!headings.has(file)) headings.set(file, anchors(docText(file)));
+    return headings.get(file);
+  };
   const broken = [];
-  for (const [file, text] of [['README.md', README], ['SPEC.md', SPEC]]) {
-    for (const [, target] of text.replace(/```[\s\S]*?```/g, '').matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  for (const file of DOC_FILES) {
+    for (const [, target] of docText(file).replace(/```[\s\S]*?```/g, '').matchAll(/\[[^\]]*\]\(([^)\s]+)\)/g)) {
       if (/^[a-z][a-z0-9+.-]*:/i.test(target)) continue; // https://, mailto:
-      const [target_file, fragment] = target.split('#');
-      const destination = target_file || file;
+      const [relative, fragment] = target.split('#');
+      const destination = relative ? path.posix.normalize(path.posix.join(path.posix.dirname(file), relative)) : file;
       if (!fs.existsSync(path.join(ROOT, destination))) broken.push(`${file}: ${target} (no such file)`);
-      else if (fragment && !headings[destination]?.has(fragment)) broken.push(`${file}: ${target} (no such heading)`);
+      else if (fragment && !(destination.endsWith('.md') && headingsOf(destination).has(fragment))) broken.push(`${file}: ${target} (no such heading)`);
     }
   }
   assert.deepEqual(broken, []);
+});
+
+test('BUILDING.md lists the tools the scripts and tests need, and matches the build output and the workflows', () => {
+  const need = BUILDING.split(/^## /m).find((section) => section.startsWith('What you need'));
+  assert.ok(need, 'BUILDING.md has a "What you need" section');
+  const probed = /const probe = \{([^}]*)\}/.exec(read('tests', 'build.test.js'))[1].match(/\b\w+(?=:)/g);
+  assert.ok(read('scripts', 'make-archive.sh').includes('gzip'), 'make-archive.sh packs with gzip');
+  for (const tool of [...probed, 'gzip', 'node', 'python3']) assert.ok(need.includes(`\`${tool}\``), `"What you need" should list ${tool}`);
+
+  const versions = new Set(WORKFLOWS.flatMap((f) => [...workflow(f).matchAll(/node-version: '(\d+)'/g)].map((m) => m[1])));
+  assert.equal(versions.size, 1, 'every workflow uses the same Node version');
+  assert.ok(BUILDING.includes(`the GitHub workflows use ${[...versions][0]}`), 'BUILDING.md should name the Node version the workflows use');
+
+  const build = read('scripts', 'build.sh');
+  assert.ok(build.includes('Built $target $label (version $version): $target/ and $package'), 'the message BUILDING.md quotes');
+  assert.ok(BUILDING.includes(`Built firefox ${label(firefox)} (version ${firefox.version}): firefox/ and dist/double-tap-to-refresh-firefox-${label(firefox)}.xpi`));
+  assert.ok(build.includes('double-tap-to-refresh-$target-$label.$extension'));
+  assert.ok(BUILDING.includes('double-tap-to-refresh-chromium-<label>.zip') && BUILDING.includes('double-tap-to-refresh-firefox-<label>.xpi'));
+
+  const scripts = ['build.sh', 'make-archive.sh', 'lib.sh'].map((f) => read('scripts', f)).join('\n').replace(/\s+/g, ' ');
+  const messages = [...BUILDING.matchAll(/`error: ([^`]+)`/g)].map((m) => m[1]);
+  assert.ok(messages.length >= 4, 'the troubleshooting table quotes the scripts\' error messages');
+  for (const message of messages) assert.ok(scripts.includes(message.replace(/\s+/g, ' ')), `no script prints "error: ${message}"`);
+});
+
+test('each system guide links back, shows the build and test commands, and is listed in BUILDING.md and the README', () => {
+  assert.deepEqual(GUIDES, ['linux.md', 'macos.md', 'termux.md', 'windows.md']);
+  assert.ok(README.includes('[BUILDING.md](BUILDING.md)'), 'README should link to BUILDING.md');
+  for (const guide of GUIDES) {
+    const text = docText(`docs/building/${guide}`);
+    assert.ok(BUILDING.includes(`(docs/building/${guide})`), `BUILDING.md should link to ${guide}`);
+    assert.ok(text.includes('(../../BUILDING.md)'), `${guide} should link back to BUILDING.md`);
+    assert.ok(text.includes('bash scripts/build.sh') && text.includes('node --test'), `${guide} should show the build and test commands`);
+  }
+});
+
+test('the Linux guide has install steps for Ubuntu, Debian, openSUSE, Arch and Fedora', () => {
+  const linux = docText('docs/building/linux.md');
+  for (const distro of ['Ubuntu', 'Debian', 'openSUSE', 'Arch', 'Fedora']) {
+    const section = linux.split(/^## /m).find((s) => s.startsWith(`${distro}\n`));
+    assert.ok(section, `linux.md should have a ${distro} section`);
+    const commands = /```sh\n([\s\S]*?)```/.exec(section)?.[1] ?? '';
+    for (const pkg of ['git', 'zip', 'unzip']) assert.match(commands, new RegExp(`\\b${pkg}\\b`), `${distro}: install ${pkg}`);
+    assert.match(commands, /\bpython3?\b/, `${distro}: install Python`);
+    assert.match(commands, /\bnodejs/, `${distro}: install Node.js`);
+  }
+});
+
+test('the docs run scripts with bash, because a fresh clone may not have the executable bit set', () => {
+  const offenders = [];
+  for (const file of DOC_FILES) {
+    for (const line of docText(file).split('\n')) {
+      const explains = line.includes('Permission denied') || line.includes('Run the scripts with `bash`');
+      if (/(^|[\s`(])\.\/scripts\//.test(line) && !explains) offenders.push(`${file}: ${line.trim()}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
 });
