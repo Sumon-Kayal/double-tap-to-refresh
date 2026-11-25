@@ -232,15 +232,16 @@
 
   (async () => {
     const revision = storageRevision;
-    let position;
+    let storedPosition;
     const initialPositionRevision = positionRevision;
     try {
       const stored = await api.storage.local.get([STORAGE.settings, STORAGE.position]);
       if (revision === storageRevision) settings = sanitizeSettings(stored[STORAGE.settings]);
-      position = initialPositionRevision === positionRevision ? stored[STORAGE.position] : latestPosition;
+      storedPosition = stored[STORAGE.position];
     } catch (_) {
       /* keep the defaults */
     }
+    const position = initialPositionRevision === positionRevision ? storedPosition : latestPosition;
     ball = createBall({
       placement: 'contained',
       container: stage,

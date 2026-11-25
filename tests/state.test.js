@@ -146,6 +146,36 @@ test('options gate early edits, preserve pending edits on external changes and m
   h.tick(); await flush(); assert.equal(writes.length, 1);
 });
 
+test('options mount with the newest position even when the startup read rejects', async () => {
+  const saved = { x: 0.2, y: 0.3 };
+  const latest = { x: 0.6, y: 0.7 };
+  const scenarios = [
+    { label: 'failed read with update', reject: true, event: { newValue: latest }, expected: latest },
+    { label: 'successful read without update', expected: saved },
+    { label: 'successful read with reset', event: { oldValue: saved }, expected: undefined },
+    { label: 'failed read without update', reject: true, expected: undefined },
+  ];
+  for (const { label, reject, event, expected } of scenarios) {
+    const h = harness();
+    let resolveRead, rejectRead, changed;
+    const mounted = [];
+    h.context.chrome.storage = {
+      local: { get: () => new Promise((resolve, reject) => { resolveRead = resolve; rejectRead = reject; }) },
+      onChanged: { addListener(fn) { changed = fn; } },
+    };
+    h.context.DTR = {
+      ...h.context.DTR,
+      createBall: ({ position }) => ({ mount() { mounted.push(position); } }),
+    };
+    vm.runInContext(source('options'), h.context);
+    if (event) changed({ position: event }, 'local');
+    if (reject) rejectRead(new Error('storage unavailable'));
+    else resolveRead({ position: saved });
+    await flush();
+    assert.deepEqual(mounted, [expected], label);
+  }
+});
+
 test('content reobserves replacement roots, limits direct removals, and skips failed catch-up reads', async () => {
   const h = harness(); let observer; let failed = false; let mounts = 0; const updates = [];
   h.context.MutationObserver = class {
