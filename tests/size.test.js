@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const BUDGET_BYTES = 25000; // about 24 KB today (comments and the license header included)
+const BUDGET_BYTES = 36000; // about 35 KB after feature import (comments and the license header included)
 const size = (name) => fs.statSync(path.join(__dirname, '..', 'src', name)).size;
 
 test('the scripts injected into every page stay within the size budget', () => {

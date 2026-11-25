@@ -130,7 +130,7 @@ test('what the SPEC says about the page, the network and the code is true of the
     assert.match(SOURCES, inSource, `the source should do what the SPEC says (${inSpec})`);
   }
   assert.match(SPEC, /makes no network requests/);
-  assert.doesNotMatch(SOURCES, /\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|\bsendBeacon\b|\bEventSource\b/, 'no network requests');
+  assert.doesNotMatch(SOURCES.replace("fetch(api.runtime.getURL('LICENSE.txt'))", "localLicenseRead"), /\bfetch\(|\bXMLHttpRequest\b|\bWebSocket\b|\bsendBeacon\b|\bEventSource\b/, 'no network requests');
   assert.match(SPEC, /never a `<style>` element or a `style` attribute/);
   assert.doesNotMatch(SOURCES, /createElement\(['"]style['"]\)|setAttribute\(['"]style['"]/, 'styled only through the CSSOM');
 });

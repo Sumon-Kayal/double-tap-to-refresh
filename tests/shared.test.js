@@ -28,11 +28,11 @@ test('sanitizeSettings returns the defaults for missing or malformed input', () 
 test('sanitizeSettings clamps to the limits and rounds whole-number settings', () => {
   assert.deepEqual(
     plain(DTR.sanitizeSettings({ transparency: 5, size: 500, doubleTapMs: 1 })),
-    { transparency: 0.85, size: 72, doubleTapMs: 200 },
+    { ...plain(DTR.DEFAULTS), transparency: 0.85, size: 72, doubleTapMs: 200 },
   );
   assert.deepEqual(
     plain(DTR.sanitizeSettings({ transparency: -1, size: 1, doubleTapMs: 99999 })),
-    { transparency: 0, size: 32, doubleTapMs: 600 },
+    { ...plain(DTR.DEFAULTS), transparency: 0, size: 32, doubleTapMs: 600 },
   );
   const rounded = DTR.sanitizeSettings({ size: 44.6, doubleTapMs: 349.4 });
   assert.equal(rounded.size, 45);
@@ -92,4 +92,9 @@ test('the message names match between shared.js and background.js', () => {
   };
   assert.equal(pick('MESSAGE_RELOAD'), DTR.MESSAGE.reload);
   assert.equal(pick('MESSAGE_RELOAD_FAILED'), DTR.MESSAGE.reloadFailed);
+});
+
+test('new appearance and docking settings validate and migrate', () => {
+  assert.deepEqual(plain(DTR.sanitizeSettings({look:'glass', dock:true, haptics:false})), {...plain(DTR.DEFAULTS), look:'glass', dock:true, haptics:false});
+  assert.deepEqual(plain(DTR.sanitizeSettings({look:'invalid', dock:1, haptics:'false'})), plain(DTR.DEFAULTS));
 });

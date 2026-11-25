@@ -13,7 +13,7 @@ function harness() {
   function node() {
     const handlers = {};
     return {
-      style: { setProperty(k, v) { this[k] = v; } }, children: [], handlers,
+      dataset: {}, style: { setProperty(k, v) { this[k] = v; } }, children: [], handlers,
       namespaceURI: 'http://www.w3.org/1999/xhtml',
       addEventListener(k, fn) { (handlers[k] ||= []).push(fn); }, removeEventListener() {},
       emit(k, values = {}) {
@@ -35,9 +35,9 @@ function harness() {
   const elements = {};
   const document = Object.assign(node(), {
     compatMode: 'CSS1Compat', documentElement: node(), createElement: node, createElementNS: node,
-    getElementById: (id) => elements[id] ||= node(),
+    querySelectorAll: () => [], getElementById: (id) => elements[id] ||= node(),
   });
-  const context = vm.createContext({ window, document, chrome: {},
+  const context = vm.createContext({ window, document, navigator: {}, chrome: {},
     setTimeout(fn) { timers.set(++timer, fn); return timer; }, clearTimeout(id) { timers.delete(id); },
     requestAnimationFrame(fn) { fn(); return 0; }, cancelAnimationFrame() {},
   });
@@ -45,10 +45,10 @@ function harness() {
   const tick = () => { const work = [...timers.values()]; timers.clear(); work.forEach((fn) => fn()); };
   return { context, window, document, elements, tick, timers };
 }
-function ballFixture() {
+function ballFixture(options = {}) {
   const h = harness();
   const moves = []; let refreshes = 0;
-  const ball = h.context.DTR.createBall({ onMoveEnd: (p) => moves.push(p), onRefresh: () => refreshes++ });
+  const ball = h.context.DTR.createBall({ ...options, onMoveEnd: (p) => moves.push(p), onRefresh: () => refreshes++ });
   ball.mount(h.document.documentElement);
   const face = h.document.documentElement.children[0].shadow.children[0];
   const pointer = (kind, extra) => face.emit(kind, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: 350, clientY: 570, timeStamp: 1000, ...extra });
@@ -63,6 +63,21 @@ test('late pre-hold touch movement cancels a timer-started drag without saving o
   h.pointer('pointerup', { timeStamp: 1400 });
   assert.equal(h.moves.length, 0); assert.equal(h.refreshes(), 0);
   assert.equal(h.face.style.translate, initial);
+});
+
+test('a swipe on a non-draggable ball applies deferred position and layout without saving', () => {
+  const h = ballFixture({ draggable: false });
+  const initial = h.face.style.translate;
+  const position = { x: 0, y: 1 };
+  h.pointer('pointerdown');
+  h.ball.update({ position });
+  Object.assign(h.window.visualViewport, { width: 200, height: 400, offsetLeft: 100, offsetTop: 200 });
+  h.window.visualViewport.emit('resize');
+  assert.equal(h.face.style.translate, initial);
+  h.pointer('pointermove', { clientX: 300, timeStamp: 1450 });
+  const p = h.context.DTR.toPixels(position, 200, 400, 44);
+  assert.equal(h.face.style.translate, `${100 + p.left}px ${200 + p.top}px`);
+  assert.equal(h.moves.length, 0);
 });
 
 test('latest deferred position, including a reset, applies after a stationary hold', () => {
@@ -122,13 +137,43 @@ test('options gate early edits, preserve pending edits on external changes and m
   size.value = '56'; size.emit('input');
   stored = { ...stored, transparency: 0.8, doubleTapMs: 550 };
   changed({ settings: { newValue: stored } }, 'local');
-  assert.equal(size.value, '56'); assert.equal(h.elements.timing.value, '550');
+  assert.equal(size.value, '56'); assert.equal(h.elements.doubleTapMs.value, '550');
   size.emit('change');
   assert.equal(reads, 2); // commit starts the read immediately, without running timers
   await flush();
   assert.equal(writes.length, 1);
   assert.deepEqual(JSON.parse(JSON.stringify(writes[0])), { ...stored, size: 56 });
   h.tick(); await flush(); assert.equal(writes.length, 1);
+});
+
+test('options mount with the newest position even when the startup read rejects', async () => {
+  const saved = { x: 0.2, y: 0.3 };
+  const latest = { x: 0.6, y: 0.7 };
+  const scenarios = [
+    { label: 'failed read with update', reject: true, event: { newValue: latest }, expected: latest },
+    { label: 'successful read without update', expected: saved },
+    { label: 'successful read with reset', event: { oldValue: saved }, expected: undefined },
+    { label: 'failed read without update', reject: true, expected: undefined },
+  ];
+  for (const { label, reject, event, expected } of scenarios) {
+    const h = harness();
+    let resolveRead, rejectRead, changed;
+    const mounted = [];
+    h.context.chrome.storage = {
+      local: { get: () => new Promise((resolve, reject) => { resolveRead = resolve; rejectRead = reject; }) },
+      onChanged: { addListener(fn) { changed = fn; } },
+    };
+    h.context.DTR = {
+      ...h.context.DTR,
+      createBall: ({ position }) => ({ mount() { mounted.push(position); } }),
+    };
+    vm.runInContext(source('options'), h.context);
+    if (event) changed({ position: event }, 'local');
+    if (reject) rejectRead(new Error('storage unavailable'));
+    else resolveRead({ position: saved });
+    await flush();
+    assert.deepEqual(mounted, [expected], label);
+  }
 });
 
 test('content reobserves replacement roots, limits direct removals, and skips failed catch-up reads', async () => {

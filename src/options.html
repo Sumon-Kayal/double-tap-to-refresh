@@ -17,21 +17,36 @@
 </head>
 <body>
   <main>
-    <h1>Double Tap to Refresh</h1>
-    <p class="lede">Double-tap the ball to reload the page you’re on. To move it, press and hold, then drag.</p>
+    <header class="head">
+      <img class="mark" src="icons/icon96.png" alt="" width="44" height="44">
+      <div>
+        <h1>Double Tap to Refresh</h1>
+        <p class="version" id="version-line">Version <span id="version"></span></p>
+      </div>
+    </header>
 
-    <div class="stage" aria-label="Preview of the ball on a light and a dark page">
-      <div id="preview"></div>
+    <p class="lede">Double-tap the ball to reload the page. To move it, press and hold, then drag.</p>
+
+    <div class="preview">
+      <div class="stage" id="stage" role="group" aria-label="Preview of the ball on a light and a dark page">
+        <p class="pill" id="status" role="status" aria-live="polite"></p>
+      </div>
+      <p class="tapinfo" id="tapinfo" aria-live="polite">Double-tap the ball to try the timing.</p>
     </div>
-    <p class="hint">Preview: double-tap the ball to try the timing.</p>
 
-    <section class="controls" aria-label="Settings">
-      <div class="control">
-        <div class="row">
-          <label for="transparency">Transparency</label>
-          <output id="transparency-out" for="transparency"></output>
+    <section class="group" aria-labelledby="appearance-title">
+      <h2 id="appearance-title">Appearance</h2>
+
+      <div class="control" role="radiogroup" aria-labelledby="look-title">
+        <span class="label" id="look-title">Look</span>
+        <div class="segmented">
+          <input type="radio" name="look" id="look-dark" value="dark" disabled>
+          <label for="look-dark">Dark</label>
+          <input type="radio" name="look" id="look-light" value="light" disabled>
+          <label for="look-light">Light</label>
+          <input type="radio" name="look" id="look-glass" value="glass" disabled>
+          <label for="look-glass">Glass</label>
         </div>
-        <input id="transparency" type="range" disabled>
       </div>
 
       <div class="control">
@@ -40,26 +55,61 @@
           <output id="size-out" for="size"></output>
         </div>
         <input id="size" type="range" disabled>
+        <div class="ends" aria-hidden="true"><span>Small</span><span>Large</span></div>
       </div>
 
       <div class="control">
         <div class="row">
-          <label for="timing">Double-tap timing</label>
-          <output id="timing-out" for="timing"></output>
+          <label for="transparency">Transparency</label>
+          <output id="transparency-out" for="transparency"></output>
         </div>
-        <input id="timing" type="range" disabled>
-        <p class="help">How quickly the second tap has to follow the first.</p>
+        <input id="transparency" type="range" disabled>
+        <div class="ends" aria-hidden="true"><span>Solid</span><span>Faint</span></div>
       </div>
+    </section>
+
+    <section class="group" aria-labelledby="behavior-title">
+      <h2 id="behavior-title">Behavior</h2>
+
+      <div class="control">
+        <div class="row">
+          <label for="doubleTapMs">Double-tap timing</label>
+          <output id="doubleTapMs-out" for="doubleTapMs"></output>
+        </div>
+        <input id="doubleTapMs" type="range" aria-describedby="timing-help" disabled>
+        <div class="ends" aria-hidden="true"><span>Quick</span><span>Relaxed</span></div>
+        <p class="help" id="timing-help">How soon the second tap has to follow the first.</p>
+      </div>
+
+      <label class="switch-row" for="haptics">
+        <span class="text">
+          <span class="name">Vibration</span>
+          <span class="help" id="haptics-help">A short tick when you grab the ball and when it refreshes.</span>
+        </span>
+        <input id="haptics" type="checkbox" role="switch" aria-describedby="haptics-help" disabled>
+      </label>
+
+      <label class="switch-row" for="dock">
+        <span class="text">
+          <span class="name">Dock to the edge</span>
+          <span class="help" id="dock-help">Snaps the ball to the nearest side and tucks it away when you aren’t using it.</span>
+        </span>
+        <input id="dock" type="checkbox" role="switch" aria-describedby="dock-help" disabled>
+      </label>
     </section>
 
     <div class="actions">
       <button id="reset-position" type="button">Reset position</button>
       <button id="reset-defaults" type="button" disabled>Restore defaults</button>
     </div>
-    <p id="status" class="status" role="status" aria-live="polite"></p>
 
-    <p class="foot">Settings are saved on this device only.</p>
-    <p class="foot">Free software under version 3 of the GNU General Public License, with no warranty. <a href="LICENSE.txt">Read the license</a>.</p>
+    <footer class="foot">
+      <p>Settings are saved on this device only.</p>
+      <details id="license">
+        <summary>License: GNU GPL v3</summary>
+        <pre id="license-text">Loading…</pre>
+      </details>
+    </footer>
   </main>
 
   <script src="shared.js"></script>

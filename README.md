@@ -54,14 +54,14 @@ Then open any web page and double-tap the ball.
 
 ## Features
 
-- A round refresh ball that stays above the page. A single tap does nothing, so you can't refresh by accident.
+- A round refresh ball that stays above the page. A single tap shows a countdown ring but does not reload, so you can't refresh by accident.
 - Double-tap with a finger, pen or mouse to reload the current tab. Enter or Space on the focused ball works too.
 - Press and hold (about 0.4 s), then drag, so scrolling the page never moves it. With a mouse you can drag at once.
 - Remembers where you put it, as a share of the screen, so it stays put after you rotate the phone or resize the window.
-- Settings with a live preview: transparency, size and double-tap timing. Changes reach every open page right away.
+- Settings with a draggable live preview: transparency, size, double-tap timing, Dark/Light/Glass looks, vibration and optional edge docking. Changes reach every open page right away.
 - Isolated from the page: a closed shadow root, styled only through the CSSOM, so page CSS can't restyle it and a strict
   Content-Security-Policy can't leave it unstyled.
-- Small and local: about 24 KB of script per page, no libraries, no network requests.
+- Small and local: about 35 KB of script per page, no libraries, no network requests.
 
 ## Compatibility
 
@@ -317,9 +317,7 @@ bash scripts/make-archive.sh <chromium|firefox> <development|release> <branch> <
   [Compatibility](#compatibility).
 - **Chromium build, automated:** run in Chrome for Testing 153 with touch emulation: single, slow and double taps, hold-and-drag, saved
   position, rotation, live settings, a strict-CSP page, keyboard activation, the options page, and both reload fallbacks
-  (38 browser checks). That run was made on the build that is now called 0.1.1-beta. Its `src/` was byte-for-byte the same;
-  since then `src/` has gained only license header comments (no JavaScript changed), a license line with a link on the options
-  page, and icons recompressed without changing a pixel. The browser suite has not been run again since.
+  (38 browser checks). This was before the imported UI features; the updated browser suite has not been run yet.
 - **Firefox build:** the manifest follows MDN (event-page background, `gecko_android`, `data_collection_permissions`) and passes
   the `web-ext` linter with no warnings. The code is the one that ran in Chromium. There is no report yet for Mozilla's own
   Firefox builds, on Android or on the desktop. If something misbehaves, the touch gestures in `src/shared.js` are the first
@@ -356,7 +354,7 @@ See [`CHANGELOG.md`](CHANGELOG.md). The current version, **0.1.1-beta**, is the 
 
 Double Tap to Refresh is free software, released under the GNU General Public License, version 3 only (`GPL-3.0-only`).
 The full text is in [`LICENSE.md`](LICENSE.md). Every package built by `scripts/build.sh` includes a copy as `LICENSE.txt`, which the
-options page links to, and every source file carries an SPDX header (`GPL-3.0-only`).
+options page displays on demand, and every source file carries an SPDX header (`GPL-3.0-only`).
 
 ```text
 Copyright (C) 2026 Sumon Kayal
