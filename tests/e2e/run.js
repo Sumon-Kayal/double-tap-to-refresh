@@ -281,9 +281,9 @@ function check(name, ok, detail = '') {
   await opts.setViewportSize({ width: 390, height: 844 });
   await opts.goto(`chrome-extension://${extId}/options.html`);
   await sleep(500);
-  const labels = await opts.evaluate(() => ['transparency-out', 'size-out', 'timing-out'].map((id) => document.getElementById(id).textContent));
+  const labels = await opts.evaluate(() => ['transparency-out', 'size-out', 'doubleTapMs-out'].map((id) => document.getElementById(id).textContent));
   check('options: sliders show the defaults', JSON.stringify(labels) === JSON.stringify(['35%', '44 px', '350 ms']), labels.join(' | '));
-  const previewHasBall = await opts.evaluate(() => document.getElementById('preview').children.length === 1);
+  const previewHasBall = await opts.evaluate(() => document.getElementById('stage').children.length === 2);
   check('options: preview ball is mounted', previewHasBall);
   await opts.screenshot({ path: path.join(SHOTS, 'options-light.png'), fullPage: true });
   await opts.emulateMedia({ colorScheme: 'dark' });
@@ -292,7 +292,7 @@ function check(name, ok, detail = '') {
 
   await opts.evaluate(() => {
     const set = (id, v) => { const el = document.getElementById(id); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); };
-    set('transparency', '60'); set('size', '56'); set('timing', '450');
+    set('transparency', '60'); set('size', '56'); set('doubleTapMs', '450');
   });
   await sleep(500);
   const saved = (await storageGet()).settings;
@@ -316,7 +316,7 @@ function check(name, ok, detail = '') {
 
   // preview double-tap: the preview ball responds without leaving the page
   await opts.evaluate(() => { globalThis.__previewDocument = true; });
-  const box = await opts.evaluate(() => { const r = document.getElementById('preview').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const box = await opts.evaluate(() => { const stage = document.getElementById('stage'); const r = stage.getBoundingClientRect(); const p = DTR.toPixels(DTR.DEFAULT_POSITION, stage.clientWidth, stage.clientHeight, 44); return { x: r.x + stage.clientLeft + p.left + 22, y: r.y + stage.clientTop + p.top + 22 }; });
   const optsCdp = await context.newCDPSession(opts);
   const t2 = (type, x, y) => optsCdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
   await t2('touchStart', box.x, box.y); await sleep(40); await t2('touchEnd'); await sleep(90);

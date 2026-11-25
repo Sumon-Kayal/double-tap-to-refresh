@@ -35,6 +35,6 @@ test('README and CHANGELOG name the same license as the source files', () => {
 });
 
 test('the options page links to LICENSE.txt, and build.sh puts that file in every build', () => {
-  assert.match(text('src', 'options.html'), /<a href="LICENSE\.txt">/);
+  assert.match(text('src', 'options.js'), /getURL\('LICENSE\.txt'\)/);
   assert.match(text('scripts', 'build.sh'), /cp "\$license" "\$target\/LICENSE\.txt"/);
 });

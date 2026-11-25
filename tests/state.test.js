@@ -13,7 +13,7 @@ function harness() {
   function node() {
     const handlers = {};
     return {
-      style: { setProperty(k, v) { this[k] = v; } }, children: [], handlers,
+      dataset: {}, style: { setProperty(k, v) { this[k] = v; } }, children: [], handlers,
       namespaceURI: 'http://www.w3.org/1999/xhtml',
       addEventListener(k, fn) { (handlers[k] ||= []).push(fn); }, removeEventListener() {},
       emit(k, values = {}) {
@@ -35,9 +35,9 @@ function harness() {
   const elements = {};
   const document = Object.assign(node(), {
     compatMode: 'CSS1Compat', documentElement: node(), createElement: node, createElementNS: node,
-    getElementById: (id) => elements[id] ||= node(),
+    querySelectorAll: () => [], getElementById: (id) => elements[id] ||= node(),
   });
-  const context = vm.createContext({ window, document, chrome: {},
+  const context = vm.createContext({ window, document, navigator: {}, chrome: {},
     setTimeout(fn) { timers.set(++timer, fn); return timer; }, clearTimeout(id) { timers.delete(id); },
     requestAnimationFrame(fn) { fn(); return 0; }, cancelAnimationFrame() {},
   });
@@ -122,7 +122,7 @@ test('options gate early edits, preserve pending edits on external changes and m
   size.value = '56'; size.emit('input');
   stored = { ...stored, transparency: 0.8, doubleTapMs: 550 };
   changed({ settings: { newValue: stored } }, 'local');
-  assert.equal(size.value, '56'); assert.equal(h.elements.timing.value, '550');
+  assert.equal(size.value, '56'); assert.equal(h.elements.doubleTapMs.value, '550');
   size.emit('change');
   assert.equal(reads, 2); // commit starts the read immediately, without running timers
   await flush();

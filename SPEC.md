@@ -74,7 +74,7 @@ Remember user preferences across browser sessions where technically supported:
 
 - Last floating-control position, stored as two ratios (0–1) of the space the ball can travel in, so it survives rotation and resizing.
 - Transparency level.
-- Other user-configurable settings: size (32–72 px) and double-tap timing.
+- Other user-configurable settings: size (32–72 px), double-tap timing, look (dark/light/glass), haptics (on by default), and edge docking (off by default). The preview supports dragging and timing feedback.
 
 All of it is kept in `storage.local` on the device.
 
@@ -181,13 +181,13 @@ Follow the principle of least privilege.
 - Request only permissions required for extension functionality: `storage`, and content-script access to `http://` and `https://` pages in the top frame. No `tabs`, `activeTab` or separate host permissions.
 - Avoid collecting browsing history.
 - Avoid collecting personal information.
-- Do not transmit user preferences to external servers. The extension makes no network requests.
+- Do not transmit user preferences to external servers. The extension makes no network requests. The license viewer reads the packaged LICENSE.txt using a local extension URL.
 - Keep preference storage local.
 - Firefox is told so with `data_collection_permissions: none`.
 
 ## 8. Performance Requirements
 
-- Keep the content script lightweight (about 24 KB unminified, comments and license header included, no libraries).
+- Keep the content script lightweight (about 35 KB unminified, comments and license header included, no libraries).
 - Avoid unnecessary background processing: the background wakes only for a message or a toolbar click.
 - Minimize DOM manipulation: one host element and one button per page.
 - Avoid interfering with webpage scrolling and touch interactions: only touches that start on the ball are affected.

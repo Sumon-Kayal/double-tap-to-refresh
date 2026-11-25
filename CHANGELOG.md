@@ -8,7 +8,57 @@ This project is released under **GPL-3.0-only**.
 
 ## [Unreleased]
 
-<small>Build, release and licensing work on top of `0.1.0-beta`. The extension's JavaScript is unchanged.</small>
+<small>Build, release and licensing work on top of `0.1.0-beta`. Includes the imported floating-ball and settings features.</small>
+
+### Imported UI features
+
+#### The ball
+
+- **Armed ring.** After the first tap a thin accent ring drains clockwise over
+  the double-tap window (the `doubleTapMs` setting), so the gesture is visible.
+  It disappears the moment the second tap lands. With reduced motion it is a
+  static ring shown for the same time.
+- **Vibration** (`haptics`, default on). 15 ms when press-and-hold registers,
+  10 ms when a refresh starts. Skipped until the page has had a tap, because
+  Chromium refuses `navigator.vibrate()` before that
+  (`navigator.userActivation.hasBeenActive`).
+- **Edge docking** (`dock`, default off, so nobody's placement moves on update).
+  A dropped ball snaps to the nearer side edge. After 2.5 s idle it tucks 40%
+  into the edge at 60% opacity, with the arrow re-centred in the visible part.
+  Touch, mouse hover or keyboard focus slides it back out. The stored position
+  stays what the user last placed (x is 0 or 1 once docked). A docked ball
+  starts out tucked on page load.
+- **Looks** (`look`: `dark` | `light` | `glass`). Dark is the 0.1.0 look. Light
+  has a dark arrow with a white halo. Glass is a tinted frosted disc using
+  `backdrop-filter`, and falls back to a plain tint where that is unsupported.
+- **One accent.** `#4d8bff` on dark surfaces, `#2f6df0` on light ones, in both
+  the ball and the settings page.
+
+#### Settings page
+
+- The preview is now a mini screen holding the real ball. Press, hold and drag
+  it there to set where it sits on every page. "Reset position" glides it back.
+- Under the preview: the gap measured on your last double-tap, or how far over
+  the limit a slow one was.
+- The preview is pinned to the top while the controls scroll, with the "Saved"
+  pill inside it, so changes are always seen and confirmed. It is not pinned in
+  short (landscape) viewports.
+- New controls: Look (segmented), Vibration, Dock to the edge. Sliders gained
+  end labels (Small/Large, Solid/Faint, Quick/Relaxed) and `aria-valuetext`.
+- Header with icon and version; footer with the GPL text, read from the bundled
+  `LICENSE.txt` the first time it is opened.
+- Fixed stray `</o>` end tags in the old markup.
+
+#### Internals
+
+- `createBall()` gained `placement: 'contained'` with `container` (replaces the
+  old `'inline'`), and an `onTiming({ gap, limit, ok })` callback.
+- Moves to a new spot (snap, tuck, reset) glide with the Web Animations API;
+  dragging still writes the position directly, so it never lags the finger.
+- Settings schema: `look`, `haptics` and `dock` were added. Older stored
+  settings load fine, because missing keys fall back to the defaults.
+- Styling stays CSSOM-only, so strict-CSP pages still show the ball.
+
 
 ### Added
 
