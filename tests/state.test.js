@@ -45,10 +45,10 @@ function harness() {
   const tick = () => { const work = [...timers.values()]; timers.clear(); work.forEach((fn) => fn()); };
   return { context, window, document, elements, tick, timers };
 }
-function ballFixture() {
+function ballFixture(options = {}) {
   const h = harness();
   const moves = []; let refreshes = 0;
-  const ball = h.context.DTR.createBall({ onMoveEnd: (p) => moves.push(p), onRefresh: () => refreshes++ });
+  const ball = h.context.DTR.createBall({ ...options, onMoveEnd: (p) => moves.push(p), onRefresh: () => refreshes++ });
   ball.mount(h.document.documentElement);
   const face = h.document.documentElement.children[0].shadow.children[0];
   const pointer = (kind, extra) => face.emit(kind, { pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: 350, clientY: 570, timeStamp: 1000, ...extra });
@@ -63,6 +63,21 @@ test('late pre-hold touch movement cancels a timer-started drag without saving o
   h.pointer('pointerup', { timeStamp: 1400 });
   assert.equal(h.moves.length, 0); assert.equal(h.refreshes(), 0);
   assert.equal(h.face.style.translate, initial);
+});
+
+test('a swipe on a non-draggable ball applies deferred position and layout without saving', () => {
+  const h = ballFixture({ draggable: false });
+  const initial = h.face.style.translate;
+  const position = { x: 0, y: 1 };
+  h.pointer('pointerdown');
+  h.ball.update({ position });
+  Object.assign(h.window.visualViewport, { width: 200, height: 400, offsetLeft: 100, offsetTop: 200 });
+  h.window.visualViewport.emit('resize');
+  assert.equal(h.face.style.translate, initial);
+  h.pointer('pointermove', { clientX: 300, timeStamp: 1450 });
+  const p = h.context.DTR.toPixels(position, 200, 400, 44);
+  assert.equal(h.face.style.translate, `${100 + p.left}px ${200 + p.top}px`);
+  assert.equal(h.moves.length, 0);
 });
 
 test('latest deferred position, including a reset, applies after a stationary hold', () => {

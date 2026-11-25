@@ -612,9 +612,10 @@
         if (draggable && event.pointerType === 'mouse') {
           beginDrag();
         } else {
-          // Moved before the hold finished: a swipe, neither a tap nor a drag.
+          // The press moved without starting a drag: cancel the tap.
           disarm();
           endGesture();
+          if (deferredPosition || pendingLayout) finishDrag();
           return;
         }
       }

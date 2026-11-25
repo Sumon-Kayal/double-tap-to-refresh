@@ -321,7 +321,10 @@ function check(name, ok, detail = '') {
   const t2 = (type, x, y) => optsCdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
   await t2('touchStart', box.x, box.y); await sleep(40); await t2('touchEnd'); await sleep(90);
   await t2('touchStart', box.x, box.y); await sleep(40); await t2('touchEnd'); await sleep(900);
-  check('options: double-tapping the preview does not navigate', await opts.evaluate(() => globalThis.__previewDocument === true));
+  const tapInfo = await opts.evaluate(() => document.getElementById('tapinfo').textContent);
+  const sameDocument = await opts.evaluate(() => globalThis.__previewDocument === true);
+  check('options: the preview registers a double tap without navigating',
+    tapInfo.startsWith('Double-tap registered:') && sameDocument, `${tapInfo} (same document: ${sameDocument})`);
 
   // ---- no console errors from the extension on a normal page
   const errors = [];
